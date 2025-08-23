@@ -2,8 +2,10 @@ import axios from "axios";
 
 // ====================== AXIOS INSTANCE ======================
 const API = axios.create({
-  baseURL: "https://student-attendance-server-n48g.onrender.com/api", // change to Render URL in prod
+  baseURL: import.meta.env.VITE_API_URL,
+  
 });
+
 
 // Attach token automatically
 API.interceptors.request.use((config) => {
