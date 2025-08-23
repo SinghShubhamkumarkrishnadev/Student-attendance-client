@@ -2,8 +2,7 @@ import axios from "axios";
 
 // ====================== AXIOS INSTANCE ======================
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  
+  baseURL: "https://student-attendance-server-n48g.onrender.com/api",
 });
 
 
