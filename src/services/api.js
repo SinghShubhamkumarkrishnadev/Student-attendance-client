@@ -74,6 +74,12 @@ export const bulkUploadStudents = async (file) => {
   return res.data.data || [];
 };
 
+// Add a single student
+export const addStudent = async (studentData) => {
+  const res = await API.post("/students", studentData);
+  return res.data.data?.student || res.data.student;
+};
+
 // Get all students (with optional filters)
 export const getStudents = async (params = {}) => {
   const res = await API.get("/students", { params });

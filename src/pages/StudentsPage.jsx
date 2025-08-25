@@ -6,8 +6,9 @@ import {
   updateStudent,
   deleteStudent,
   bulkUploadStudents,
-  batchUpdateStudentsClient, // new helper
+  batchUpdateStudentsClient,
   batchDeleteStudentsClient,
+  addStudent,
 } from "../services/api";
 import { toast } from "react-toastify";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -20,6 +21,14 @@ const StudentPage = () => {
   const [selectedStudent, setSelectedStudent] = useState(null); // inline editor model
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState(null);
+
+  const [newStudent, setNewStudent] = useState({
+    name: "",
+    enrollmentNumber: "",
+    semester: "",
+    division: "",
+  });
+  const [adding, setAdding] = useState(false);
 
   // selection + batch UI state
   const [selectedIds, setSelectedIds] = useState([]);
@@ -63,6 +72,30 @@ const StudentPage = () => {
   useEffect(() => {
     fetchStudents();
   }, []);
+
+  const handleAddStudent = async () => {
+    if (!newStudent.name || !newStudent.enrollmentNumber || !newStudent.semester) {
+      toast.error("⚠️ Please fill in Name, Enrollment, and Semester");
+      return;
+    }
+
+    try {
+      setAdding(true);
+      await addStudent(newStudent);
+      toast.success("✅ Student added!");
+      setNewStudent({ name: "", enrollmentNumber: "", semester: "", division: "" });
+      fetchStudents();
+    } catch (err) {
+      console.error("Error adding student:", err);
+      const backendMsg = err.response?.data?.error;
+      const finalMsg = backendMsg ? `Failed to add student: ${backendMsg}` : "Failed to add student";
+      setError(finalMsg);
+      toast.error(finalMsg);
+    } finally {
+      setAdding(false);
+    }
+  };
+
 
   // Handle inline edit open (per-card loading)
   const handleEdit = async (id) => {
@@ -316,6 +349,50 @@ const StudentPage = () => {
       <h2 className="text-3xl font-bold mb-6 flex items-center gap-2 text-purple-700">
         📚 Student Management
       </h2>
+
+      {/* Add single student */}
+      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md">
+        <h3 className="text-lg font-semibold mb-3">➕ Add Single Student</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <input
+            type="text"
+            placeholder="Name"
+            value={newStudent.name}
+            onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+            className="border p-2 rounded-lg shadow"
+          />
+          <input
+            type="text"
+            placeholder="Enrollment Number"
+            value={newStudent.enrollmentNumber}
+            onChange={(e) =>
+              setNewStudent({ ...newStudent, enrollmentNumber: e.target.value })
+            }
+            className="border p-2 rounded-lg shadow"
+          />
+          <input
+            type="number"
+            placeholder="Semester"
+            value={newStudent.semester}
+            onChange={(e) => setNewStudent({ ...newStudent, semester: e.target.value })}
+            className="border p-2 rounded-lg shadow"
+          />
+          <input
+            type="text"
+            placeholder="Division (optional)"
+            value={newStudent.division}
+            onChange={(e) => setNewStudent({ ...newStudent, division: e.target.value })}
+            className="border p-2 rounded-lg shadow"
+          />
+        </div>
+        <button
+          className="mt-4 px-4 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleAddStudent}
+          disabled={adding}
+        >
+          {adding ? "⏳ Adding..." : "➕ Add Student"}
+        </button>
+      </div>
 
       {/* Bulk upload */}
       <div className="mb-6 bg-white p-4 rounded-2xl shadow-md flex items-center gap-4">
