@@ -125,6 +125,7 @@ const StudentPage = () => {
       setSaving(true);
       await updateStudent(selectedStudent._id, {
         name: selectedStudent.name,
+        enrollmentNumber: selectedStudent.enrollmentNumber,
         semester: selectedStudent.semester,
         division: selectedStudent.division,
       });
@@ -579,7 +580,16 @@ const StudentPage = () => {
                             }
                             className="w-full border p-2 rounded mb-2"
                           />
-                          <p className="text-sm text-gray-500 mb-2">🆔 {s.enrollmentNumber}</p>
+                          <input
+                            type="text"
+                            value={selectedStudent.enrollmentNumber}
+                            onChange={(e) =>
+                              setSelectedStudent((st) => ({ ...st, enrollmentNumber: e.target.value }))
+                            }
+                            className="w-full border p-2 rounded mb-2"
+                            placeholder="Enrollment Number"
+                            disabled={saving}
+                          />
 
                           <div className="flex gap-2 mb-2">
                             <input
