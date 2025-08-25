@@ -5,7 +5,6 @@ const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
 });
 
-
 // Attach token automatically
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem("hodToken");
@@ -29,6 +28,53 @@ export const deleteProfessor = (id) => API.delete(`/professors/${id}`);
 export const updateProfessor = (id, profData) =>
   API.put(`/professors/${id}`, profData);
 
+// ====================== PROFESSOR BULK APIs ======================
+
+// Bulk upload professors via Excel
+export const bulkUploadProfessors = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await API.post("/professors/bulk-upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  // server returns a summary object; return it
+  return res.data?.data || res.data;
+};
+
+// Bulk delete professors in one API call
+export const deleteProfessorsBulk = async (professorIds) => {
+  const ids = Array.from(new Set((professorIds || []).map(String)));
+  if (ids.length === 0) {
+    // keep consistent return shape as other helpers
+    return { totalDeleted: 0, totalRequested: 0 };
+  }
+  const res = await API.delete("/professors/bulk", {
+    headers: { "Content-Type": "application/json" },
+    data: { professorIds: ids },
+  });
+  return res.data?.data || res.data;
+};
+
+// Convenience wrapper for frontend code
+export const batchDeleteProfessorsClient = async (professorIds, { onProgress } = {}) => {
+  const results = { success: [], failed: [] };
+  const ids = Array.from(new Set((professorIds || []).map(String))); // dedupe
+
+  if (ids.length === 0) return results;
+
+  try {
+    const res = await deleteProfessorsBulk(ids);
+    // backend returns totalDeleted etc; treat as success for all requested
+    results.success = ids;
+  } catch (err) {
+    results.failed = ids.map((id) => ({ id, error: err?.response?.data || err?.message || err }));
+  }
+
+  onProgress?.({ done: ids.length, total: ids.length });
+  return results;
+};
+
 // ====================== CLASS APIs ======================
 
 // Create new class
@@ -49,10 +95,41 @@ export const getClassById = (id) => API.get(`/classes/${id}`);
 export const updateClass = (id, classData) =>
   API.put(`/classes/${id}`, classData);
 
-// Delete class
+// Delete single class
 export const deleteClass = (id) => API.delete(`/classes/${id}`);
 
+// ✅ Bulk delete classes in one API call (matches DELETE /classes/bulk)
+export const deleteClassesBulk = async (classIds) => {
+  const res = await API.delete("/classes/bulk", {
+    headers: { "Content-Type": "application/json" },
+    data: { classIds: Array.from(new Set((classIds || []).map(String))) },
+  });
+  // Return the useful payload regardless of server shape
+  return res.data?.data || res.data;
+};
 
+// Convenience client wrapper with progress callback
+export const batchDeleteClassesClient = async (classIds, { onProgress } = {}) => {
+  const results = { success: [], failed: [] };
+  const ids = Array.from(new Set((classIds || []).map(String))); // dedupe
+
+  if (ids.length === 0) return results;
+
+  try {
+    await deleteClassesBulk(ids);
+    results.success = ids;
+  } catch (err) {
+    results.failed = ids.map((id) => ({
+      id,
+      error: err?.response?.data || err?.message || err,
+    }));
+  }
+
+  onProgress?.({ done: ids.length, total: ids.length });
+  return results;
+};
+
+// ====================== CLASS → PROFESSOR ASSIGNMENT APIs ======================
 // Assign professors to a class
 export const assignProfessorsToClass = (classId, professorIds) =>
   API.post(`/classes/${classId}/professors`, { professorIds });
@@ -60,7 +137,6 @@ export const assignProfessorsToClass = (classId, professorIds) =>
 // Remove professors from a class
 export const removeProfessorsFromClass = (classId, professorIds) =>
   API.delete(`/classes/${classId}/professors`, { data: { professorIds } });
-
 
 // ====================== STUDENT APIs ======================
 // Bulk upload students via Excel
@@ -71,7 +147,7 @@ export const bulkUploadStudents = async (file) => {
   const res = await API.post("/students/bulk-upload", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
-  return res.data.data || [];
+  return res.data || res.data.data;
 };
 
 // Add a single student
@@ -139,7 +215,6 @@ export const batchUpdateStudentsClient = async (
       const s = updates.semester;
       allowed.semester =
         s === "" || s === null || typeof s === "undefined" ? undefined : Number(s);
-      // if Number(s) is NaN, we won't include it
       if (Number.isNaN(allowed.semester)) delete allowed.semester;
     }
     if (updates.hasOwnProperty("division")) {
@@ -150,7 +225,6 @@ export const batchUpdateStudentsClient = async (
     }
   }
 
-  // if nothing to send after sanitization, fail early
   if (!allowed || Object.keys(allowed).length === 0) {
     throw new Error("No valid fields to update. Only 'semester' and 'division' are allowed.");
   }
@@ -184,7 +258,7 @@ export const batchUpdateStudentsClient = async (
   return results;
 };
 
-// ====================== CLIENT-SIDE BULK DELETE (single API call) ======================
+// ====================== CLIENT-SIDE BULK DELETE (students, single API call) ======================
 export const batchDeleteStudentsClient = async (
   studentIds,
   { onProgress } = {}
@@ -208,7 +282,6 @@ export const batchDeleteStudentsClient = async (
   }
 };
 
-
 // Bulk delete students in one API call
 export const deleteStudentsBulk = async (studentIds) => {
   const res = await API.delete("/students", {
@@ -217,7 +290,6 @@ export const deleteStudentsBulk = async (studentIds) => {
   });
   return res.data.data || res.data;
 };
-
 
 // ====================== CLIENT-SIDE BATCH REMOVER ======================
 // Calls backend once with all studentIds
@@ -244,7 +316,16 @@ export const batchRemoveStudentsFromClassClient = async (
   return results;
 };
 
+// ====================== CLASS BULK UPLOAD ======================
+export const bulkUploadClasses = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
 
+  const res = await API.post("/classes/bulk-upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
 
+  return res.data;
+};
 
 export default API;

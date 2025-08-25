@@ -1,9 +1,30 @@
 // src/pages/ProfessorsPage.jsx
-import { useEffect, useMemo, useState } from "react";
-import { addProfessor, getProfessors, updateProfessor, deleteProfessor } from "../services/api";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  PlusCircle, Edit, XCircle, User, BookOpen, Loader2,
-  Filter, Search, RefreshCw, SortAsc, SortDesc
+  addProfessor,
+  getProfessors,
+  updateProfessor,
+  deleteProfessor,
+  bulkUploadProfessors, // ✅ added
+  batchDeleteProfessorsClient, // ✅ added
+} from "../services/api";
+import {
+  PlusCircle,
+  Edit,
+  XCircle,
+  User,
+  BookOpen,
+  Loader2,
+  Filter,
+  Search,
+  RefreshCw,
+  SortAsc,
+  SortDesc,
+  Eye,
+  EyeOff,
+  Trash2,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -14,6 +35,9 @@ export default function ProfessorsPage() {
   const [form, setForm] = useState({ name: "", username: "", password: "" });
   const [editId, setEditId] = useState(null);
   const [error, setError] = useState("");
+
+  const [showPasswordAdd, setShowPasswordAdd] = useState(false); // for Add form
+  const [showPasswordEdits, setShowPasswordEdits] = useState({}); // per-professor toggle
 
   // New UI state
   const [search, setSearch] = useState("");
@@ -26,6 +50,13 @@ export default function ProfessorsPage() {
   const [editLoadingId, setEditLoadingId] = useState(null); // shows brief spinner on Edit click
   const [savingId, setSavingId] = useState(null); // id of professor being saved
 
+  // Bulk upload / delete states
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const headerCheckboxRef = useRef(null);
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -37,6 +68,7 @@ export default function ProfessorsPage() {
       setLoading(true);
       setError("");
       const res = await getProfessors();
+      // getProfessors returns the axios response; original code used res.data...
       setProfessors(res?.data?.professors || []);
     } catch (err) {
       console.error(err);
@@ -47,6 +79,22 @@ export default function ProfessorsPage() {
       setLoading(false);
     }
   };
+
+  // Keep selection valid when list changes
+  useEffect(() => {
+    if (!Array.isArray(professors) || professors.length === 0) {
+      if (selectedIds.size) setSelectedIds(new Set());
+      return;
+    }
+    const validIds = new Set(professors.map((c) => String(c._id)));
+    let mutated = false;
+    const next = new Set();
+    selectedIds.forEach((id) => {
+      if (validIds.has(id)) next.add(id);
+      else mutated = true;
+    });
+    if (mutated) setSelectedIds(next);
+  }, [professors]); // eslint-disable-line
 
   const handleAddProfessor = async (e) => {
     e.preventDefault();
@@ -75,8 +123,17 @@ export default function ProfessorsPage() {
       setSavingId(id);
       const prof = professors.find((p) => p._id === id);
       if (!prof) throw new Error("Professor not found");
-      await updateProfessor(id, { name: prof.name, username: prof.username });
+
+      // build update payload
+      const updatePayload = { name: prof.name, username: prof.username };
+      if (prof.password && prof.password.trim() !== "") {
+        updatePayload.password = prof.password;
+      }
+
+      await updateProfessor(id, updatePayload);
       toast.success("✅ Professor updated");
+
+      // reset
       setEditId(null);
       await fetchProfessors();
     } catch (err) {
@@ -108,6 +165,11 @@ export default function ProfessorsPage() {
       await deleteProfessor(id);
       toast.success("🗑️ Professor deleted");
       await fetchProfessors();
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } catch (err) {
       console.error("delete error", err);
       const backendMsg = err.response?.data?.error;
@@ -117,7 +179,33 @@ export default function ProfessorsPage() {
 
       setError(finalMsg);
       toast.error(finalMsg);
+    }
+  };
 
+  // Bulk upload handler
+  const handleBulkUpload = async () => {
+    if (!bulkFile) {
+      toast.error("📂 Please select an Excel file first!");
+      return;
+    }
+
+    try {
+      setBulkUploading(true);
+      const res = await bulkUploadProfessors(bulkFile);
+      const totalProcessed = res.totalProcessed ?? 0;
+      const inserted = res.inserted ?? res.insertedDetails?.length ?? res.insertedDetails ? res.insertedDetails.length : 0;
+      const skipped = res.skipped ?? res.skippedDetails?.length ?? 0;
+      const errors = res.errors?.length ?? 0;
+
+      toast.success(`✅ ${inserted} added, ${skipped} skipped, ${errors} errors.`);
+      setBulkFile(null);
+      await fetchProfessors();
+    } catch (err) {
+      console.error("Bulk professor upload failed", err);
+      const backendMsg = err.response?.data?.error;
+      toast.error(backendMsg ? `Bulk upload failed: ${backendMsg}` : "Bulk upload failed");
+    } finally {
+      setBulkUploading(false);
     }
   };
 
@@ -167,6 +255,92 @@ export default function ProfessorsPage() {
 
   const letters = ["", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""), "0-9"];
 
+  // ===== Selection helpers =====
+  const filteredIds = useMemo(() => filtered.map((c) => String(c._id)), [filtered]);
+
+  const allOnPageSelected = useMemo(() => {
+    if (!filteredIds.length) return false;
+    return filteredIds.every((id) => selectedIds.has(id));
+  }, [filteredIds, selectedIds]);
+
+  const someOnPageSelected = useMemo(() => {
+    if (!filteredIds.length) return false;
+    return filteredIds.some((id) => selectedIds.has(id)) && !allOnPageSelected;
+  }, [filteredIds, selectedIds, allOnPageSelected]);
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) headerCheckboxRef.current.indeterminate = someOnPageSelected;
+  }, [someOnPageSelected]);
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const s = String(id);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        filteredIds.forEach((id) => next.delete(id));
+      } else {
+        filteredIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  // ===== Bulk delete handler =====
+  const handleBulkDeleteSelected = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) {
+      toast.info("No professors selected.");
+      return;
+    }
+
+    const ok = await confirm({
+      title: `Delete ${ids.length} selected ${ids.length === 1 ? "professor" : "professors"}`,
+      message:
+        "This will remove the professors and pull them from classes. This action cannot be undone.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    try {
+      setBulkDeleting(true);
+      const { success, failed } = await batchDeleteProfessorsClient(ids, {
+        onProgress: ({ done, total }) => {
+          // we don't display progress UI now, but could wire to a toast/progress bar
+        },
+      });
+
+      if (success.length) {
+        toast.success(`🗑️ Deleted ${success.length} ${success.length === 1 ? "professor" : "professors"}.`);
+      }
+      if (failed.length) {
+        toast.error(`⚠️ Failed to delete ${failed.length} item(s).`);
+        console.error("Bulk delete failed items:", failed);
+      }
+
+      clearSelection();
+      await fetchProfessors();
+    } catch (err) {
+      console.error("Bulk delete error:", err);
+      const backendMsg = err?.response?.data?.error;
+      toast.error(backendMsg ? `Bulk delete failed: ${backendMsg}` : "Bulk delete failed");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <div className="p-6 min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
       <h1 className="text-3xl font-extrabold text-purple-700 mb-6 flex items-center gap-2">
@@ -177,7 +351,7 @@ export default function ProfessorsPage() {
       {error && <div className="mb-4 bg-red-100 text-red-700 p-3 rounded-lg">{error}</div>}
 
       {/* Controls: Search + Filters + Sort */}
-      <div className="bg-white border rounded-2xl shadow-sm p-4 mb-6">
+      <div className="bg-white border rounded-2xl shadow-sm p-4 mb-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} />
@@ -238,10 +412,72 @@ export default function ProfessorsPage() {
           <span className="font-semibold">{Array.isArray(professors) ? professors.length : 0}</span>{" "}
           professors
         </div>
+
+        {/* Bulk toolbar */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={toggleSelectAllOnPage}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            disabled={!filtered.length}
+            title={allOnPageSelected ? "Unselect all visible" : "Select all visible"}
+          >
+            {allOnPageSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+            {allOnPageSelected ? "Unselect All (visible)" : "Select All (visible)"}
+          </button>
+
+          <button
+            onClick={clearSelection}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50"
+            disabled={!selectedIds.size}
+            title="Clear selection"
+          >
+            Clear Selection
+          </button>
+
+          <button
+            onClick={handleBulkDeleteSelected}
+            className="px-3 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 flex items-center gap-2 disabled:opacity-60"
+            disabled={!selectedIds.size || bulkDeleting}
+            title="Delete selected"
+          >
+            {bulkDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+            {bulkDeleting ? "Deleting..." : `Delete Selected (${selectedIds.size})`}
+          </button>
+        </div>
+      </div>
+
+      {/* Bulk Upload Professors */}
+      <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
+        <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Professors</h2>
+        <div className="flex flex-col md:flex-row gap-3 items-center">
+          <input
+            type="file"
+            accept=".xlsx, .xls, .csv"
+            onChange={(e) => setBulkFile(e.target.files[0])}
+            className="border rounded-lg px-3 py-2"
+            disabled={bulkUploading}
+          />
+          <button
+            onClick={handleBulkUpload}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 disabled:opacity-60"
+            disabled={bulkUploading}
+          >
+            {bulkUploading ? (
+              <>
+                <Loader2 className="animate-spin" size={16} /> Uploading...
+              </>
+            ) : (
+              "Upload"
+            )}
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mt-1">
+          Excel file (.xlsx, .xls or .csv). Required columns: <strong>name</strong>, <strong>username</strong>. Password optional.
+        </p>
       </div>
 
       {/* Add Professor Form */}
-      <div className="bg-purple-50 p-6 rounded-2xl shadow-md mb-8">
+      <div className="bg-white p-6 rounded-2xl shadow-md mb-8 border">
         <h2 className="text-lg font-semibold text-purple-700 mb-4 flex items-center gap-2">
           <PlusCircle /> Add New Professor
         </h2>
@@ -264,15 +500,25 @@ export default function ProfessorsPage() {
             required
             disabled={adding}
           />
-          <input
-            type="password"
-            placeholder="🔒 Password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
-            required
-            disabled={adding}
-          />
+          <div className="relative">
+            <input
+              type={showPasswordAdd ? "text" : "password"}
+              placeholder="🔒 Password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400 w-full"
+              required
+              disabled={adding}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPasswordAdd((prev) => !prev)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+            >
+              {showPasswordAdd ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+
           <button
             type="submit"
             className="md:col-span-3 bg-purple-600 hover:bg-purple-700 transition text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
@@ -301,105 +547,148 @@ export default function ProfessorsPage() {
         <p className="text-gray-600 text-center">📭 No professors match your filters</p>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((prof) => (
-            <div
-              key={prof._id}
-              className="bg-white shadow-md rounded-xl p-5 border hover:shadow-lg transition"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <User className="text-purple-600" size={32} />
-                {editId === prof._id ? (
+          {filtered.map((prof) => {
+            const isSelected = selectedIds.has(String(prof._id));
+            return (
+              <div
+                key={prof._id}
+                className="relative bg-white shadow-md rounded-xl p-5 border hover:shadow-lg transition"
+              >
+                {/* selection checkbox top-right */}
+                <div className="absolute right-3 top-3">
                   <input
-                    value={prof.name}
-                    onChange={(e) =>
-                      setProfessors((prev) =>
-                        prev.map((p) => (p._id === prof._id ? { ...p, name: e.target.value } : p))
-                      )
-                    }
-                    className="px-2 py-1 border rounded w-full"
-                    disabled={savingId === prof._id}
+                    type="checkbox"
+                    aria-label={`Select ${prof.name}`}
+                    checked={isSelected}
+                    onChange={() => toggleSelectOne(prof._id)}
                   />
-                ) : (
-                  <h3 className="text-lg font-bold text-gray-800 truncate">{prof.name}</h3>
-                )}
-              </div>
-              <p className="text-gray-600 mb-4 flex items-center gap-2">
-                <BookOpen size={18} className="text-purple-500" />
-                {editId === prof._id ? (
-                  <input
-                    value={prof.username}
-                    onChange={(e) =>
-                      setProfessors((prev) =>
-                        prev.map((p) =>
-                          p._id === prof._id ? { ...p, username: e.target.value } : p
+                </div>
+
+                <div className="flex items-center gap-3 mb-4">
+                  <User className="text-purple-600" size={32} />
+                  {editId === prof._id ? (
+                    <input
+                      value={prof.name}
+                      onChange={(e) =>
+                        setProfessors((prev) =>
+                          prev.map((p) => (p._id === prof._id ? { ...p, name: e.target.value } : p))
                         )
-                      )
-                    }
-                    className="px-2 py-1 border rounded w-full"
-                    disabled={savingId === prof._id}
-                  />
-                ) : (
-                  <span className="truncate">{prof.username}</span>
-                )}
-              </p>
-              <div className="flex gap-2">
-                {editId === prof._id ? (
-                  <>
-                    <button
-                      onClick={() => handleUpdateProfessor(prof._id)}
-                      className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-2 disabled:opacity-60"
+                      }
+                      className="px-2 py-1 border rounded w-full"
                       disabled={savingId === prof._id}
-                    >
-                      {savingId === prof._id ? (
-                        <>
-                          <Loader2 className="animate-spin" size={14} /> Saving...
-                        </>
-                      ) : (
-                        "💾 Save"
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setEditId(null)}
-                      className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded-lg text-sm"
+                    />
+                  ) : (
+                    <h3 className="text-lg font-bold text-gray-800 truncate">{prof.name}</h3>
+                  )}
+                </div>
+                <p className="text-gray-600 mb-4 flex items-center gap-2">
+                  <BookOpen size={18} className="text-purple-500" />
+                  {editId === prof._id ? (
+                    <input
+                      value={prof.username}
+                      onChange={(e) =>
+                        setProfessors((prev) =>
+                          prev.map((p) =>
+                            p._id === prof._id ? { ...p, username: e.target.value } : p
+                          )
+                        )
+                      }
+                      className="px-2 py-1 border rounded w-full"
                       disabled={savingId === prof._id}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
+                    />
+                  ) : (
+                    <span className="truncate">{prof.username}</span>
+                  )}
+                </p>
+
+                {/* Extra password field in edit mode */}
+                {editId === prof._id && (
+                  <div className="relative mb-3">
+                    <input
+                      type={showPasswordEdits[prof._id] ? "text" : "password"}
+                      value={prof.password || ""} // optional, depending on backend response
+                      onChange={(e) =>
+                        setProfessors((prev) =>
+                          prev.map((p) =>
+                            p._id === prof._id ? { ...p, password: e.target.value } : p
+                          )
+                        )
+                      }
+                      className="px-2 py-1 border rounded w-full"
+                      disabled={savingId === prof._id}
+                    />
                     <button
-                      onClick={() => {
-                        // show a tiny loading indication on Edit click (useful when UI may do more in future)
-                        setEditLoadingId(prof._id);
-                        // enter edit mode on next tick so the spinner is perceptible (very short)
-                        setTimeout(() => {
-                          setEditId(prof._id);
-                          setEditLoadingId(null);
-                        }, 120);
-                      }}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1 disabled:opacity-60"
-                      disabled={savingId !== null}
+                      type="button"
+                      onClick={() =>
+                        setShowPasswordEdits((prev) => ({
+                          ...prev,
+                          [prof._id]: !prev[prof._id],
+                        }))
+                      }
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                     >
-                      {editLoadingId === prof._id ? (
-                        <Loader2 className="animate-spin" size={14} />
-                      ) : (
-                        <Edit size={16} />
-                      )}
-                      Edit
+                      {showPasswordEdits[prof._id] ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
-                    <button
-                      onClick={() => handleDeleteProfessor(prof._id)}
-                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
-                      disabled={savingId !== null}
-                    >
-                      <XCircle size={16} /> Delete
-                    </button>
-                  </>
+                  </div>
                 )}
+
+                <div className="flex gap-2">
+                  {editId === prof._id ? (
+                    <>
+                      <button
+                        onClick={() => handleUpdateProfessor(prof._id)}
+                        className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-2 disabled:opacity-60"
+                        disabled={savingId === prof._id}
+                      >
+                        {savingId === prof._id ? (
+                          <>
+                            <Loader2 className="animate-spin" size={14} /> Saving...
+                          </>
+                        ) : (
+                          "💾 Save"
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setEditId(null)}
+                        className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded-lg text-sm"
+                        disabled={savingId === prof._id}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditLoadingId(prof._id);
+                          setTimeout(() => {
+                            setEditId(prof._id);
+                            setEditLoadingId(null);
+                          }, 120);
+                        }}
+                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1 disabled:opacity-60"
+                        disabled={savingId !== null}
+                      >
+                        {editLoadingId === prof._id ? (
+                          <Loader2 className="animate-spin" size={14} />
+                        ) : (
+                          <Edit size={16} />
+                        )}
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProfessor(prof._id)}
+                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+                        disabled={savingId !== null}
+                      >
+                        <XCircle size={16} /> Delete
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

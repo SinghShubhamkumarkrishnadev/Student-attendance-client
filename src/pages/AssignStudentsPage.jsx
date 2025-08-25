@@ -11,6 +11,7 @@ import { PlusCircle, XCircle, Search, Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useConfirm } from "../components/ConfirmProvider";
 import BatchProgress from "../components/BatchProgress";
+import Select from "react-select";
 
 export default function AssignStudentsPage() {
   const [classes, setClasses] = useState([]);
@@ -53,6 +54,17 @@ export default function AssignStudentsPage() {
     fetchClasses();
     fetchStudents();
   }, []);
+
+  // Prepare options for react-select
+  const classOptions = classes.map((cls) => ({
+    value: String(cls._id),
+    label: `${cls.classId} - ${cls.className} (${cls.division})`,
+  }));
+
+  // react-select expects selected value object
+  const selectedOption = selectedClass
+    ? classOptions.find((opt) => opt.value === selectedClass)
+    : null;
 
   const normalizeClassesResp = (res) => {
     if (Array.isArray(res)) return res;
@@ -415,18 +427,6 @@ export default function AssignStudentsPage() {
   const availableToShow = filteredAvailable.slice(0, availableVisibleCount);
   const assignedToShow = assignedList.slice(0, assignedVisibleCount);
 
-  // ---- clear filters helper ----
-  const clearAllFilters = () => {
-    setSearchAvailable("");
-    setStartsWith("");
-    setSemesterAvailable("");
-    setDivisionAvailable("");
-    setSearchAssigned("");
-    setSemesterAssigned("");
-    setAvailableVisibleCount(PAGE_SIZE);
-    setAssignedVisibleCount(PAGE_SIZE);
-  };
-
   return (
     <div className="p-6 min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
       <h1 className="text-3xl font-bold mb-6 flex items-center gap-2 text-green-700">
@@ -454,27 +454,21 @@ export default function AssignStudentsPage() {
         <label className="font-medium text-gray-700 mb-2 block">📌 Select Class</label>
 
         <div className="flex items-center gap-3">
-          <select
-            className="border px-4 py-2 rounded-lg w-full shadow-sm"
-            onChange={(e) => {
-              setSelectedClass(e.target.value || null);
+          <Select
+            options={classOptions}
+            value={selectedOption}
+            onChange={(opt) => {
+              setSelectedClass(opt ? opt.value : null);
               setSelectedStudents([]);
               setSelectedAssignedIds([]);
               setAvailableVisibleCount(PAGE_SIZE);
               setAssignedVisibleCount(PAGE_SIZE);
             }}
-            value={selectedClass || ""}
-            disabled={loadingClasses || loadingStudents || assigning || removingBulk || removingId !== null}
-          >
-            <option value="">
-              {loadingClasses ? "-- Loading classes... --" : "-- Select a Class --"}
-            </option>
-            {classes.map((cls) => (
-              <option key={String(cls._id)} value={String(cls._id)}>
-                {cls.classId} - {cls.className} ({cls.division || "—"})
-              </option>
-            ))}
-          </select>
+            isClearable
+            isDisabled={loadingClasses || loadingStudents || assigning || removingBulk || removingId !== null}
+            placeholder={loadingClasses ? "-- Loading classes... --" : "-- Select or Search a Class --"}
+            classNamePrefix="react-select"
+          />
 
           <button
             onClick={fetchClasses}

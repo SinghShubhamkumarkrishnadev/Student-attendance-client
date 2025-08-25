@@ -9,6 +9,7 @@ import {
 import { PlusCircle, XCircle, Search, RefreshCw, Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useConfirm } from "../components/ConfirmProvider";
+import Select from "react-select";
 
 export default function AssignProfessorsPage() {
   const [classes, setClasses] = useState([]);
@@ -30,6 +31,19 @@ export default function AssignProfessorsPage() {
     fetchClasses();
     fetchProfessors();
   }, []);
+
+  // Prepare options for react-select
+  const classOptions = classes.map((cls) => ({
+    value: String(cls._id),
+    label: `${cls.classId} - ${cls.className} (${cls.division})`,
+  }));
+
+
+   // react-select expects selected value object
+  const selectedOption = selectedClass
+    ? classOptions.find((opt) => opt.value === selectedClass)
+    : null;
+  
 
   // Accept either an array or axios-like response
   const normalizeClassesResp = (res) => {
@@ -165,7 +179,7 @@ export default function AssignProfessorsPage() {
 
   // when switching class, clear selected professors to avoid accidental assign
   const handleClassChange = (value) => {
-    setSelectedClass(value || null);
+    setSelectedClass(value ? value.value : null);
     setSelectedProfs([]);
     setSearchAssigned("");
   };
@@ -185,19 +199,15 @@ export default function AssignProfessorsPage() {
       {/* Select Class */}
       <div className="mb-6 bg-white p-4 rounded-2xl shadow-md">
         <label className="font-medium text-gray-700 mb-2 block">📌 Select Class</label>
-        <select
-          className="border px-4 py-2 rounded-lg w-full shadow-sm"
-          onChange={(e) => handleClassChange(e.target.value)}
-          value={selectedClass || ""}
-          disabled={assigning || removingId !== null}
-        >
-          <option value="">-- Select a Class --</option>
-          {classes.map((cls) => (
-            <option key={String(cls._id)} value={String(cls._id)}>
-              {cls.classId} - {cls.className} ({cls.division})
-            </option>
-          ))}
-        </select>
+        <Select
+          options={classOptions}
+          value={selectedOption}
+          onChange={handleClassChange}
+          isClearable
+          isDisabled={assigning || removingId !== null}
+          placeholder="-- Select or Search a Class --"
+          classNamePrefix="react-select"
+        />
       </div>
 
       {/* Summary / counts */}
@@ -236,18 +246,6 @@ export default function AssignProfessorsPage() {
                 value={searchAvailable}
                 onChange={(e) => setSearchAvailable(e.target.value)}
                 disabled={assigning || removingId !== null}
-              />
-            </div>
-            <div className="flex items-center gap-2 col-span-3">
-              <RefreshCw
-                className="ml-auto cursor-pointer"
-                size={18}
-                onClick={() => {
-                  if (assigning || removingId !== null) return;
-                  fetchProfessors();
-                  fetchClasses();
-                }}
-                title="Refresh lists"
               />
             </div>
           </div>

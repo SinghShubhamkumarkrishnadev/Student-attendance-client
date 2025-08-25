@@ -5,6 +5,8 @@ import {
   getClasses,
   updateClass,
   deleteClass,
+  bulkUploadClasses,
+  batchDeleteClassesClient, // ✅ added
 } from "../services/api";
 import {
   PlusCircle,
@@ -16,6 +18,9 @@ import {
   SortAsc,
   SortDesc,
   Loader2,
+  Trash2, // ✅ added
+  CheckSquare, // ✅ added
+  Square,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -42,6 +47,13 @@ export default function ClassesPage() {
   const [editLoadingId, setEditLoadingId] = useState(null); // micro spinner when entering edit mode
   const [savingId, setSavingId] = useState(null); // id being saved
 
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
+
+  // ✅ Bulk delete state
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
   const confirm = useConfirm();
 
   useEffect(() => {
@@ -61,6 +73,47 @@ export default function ClassesPage() {
       setClasses([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Keep selection valid when list changes
+  useEffect(() => {
+    if (!Array.isArray(classes) || classes.length === 0) {
+      if (selectedIds.size) setSelectedIds(new Set());
+      return;
+    }
+    const validIds = new Set(classes.map((c) => String(c._id)));
+    let mutated = false;
+    const next = new Set();
+    selectedIds.forEach((id) => {
+      if (validIds.has(id)) next.add(id);
+      else mutated = true;
+    });
+    if (mutated) setSelectedIds(next);
+  }, [classes]); // eslint-disable-line
+
+  const handleBulkUpload = async () => {
+    if (!bulkFile) {
+      toast.error("📂 Please select an Excel file first!");
+      return;
+    }
+
+    try {
+      setBulkUploading(true);
+
+      const res = await bulkUploadClasses(bulkFile); 
+      const totalUploaded = res.totalUploaded || 0;
+      const totalSkipped = res.totalSkipped || 0;
+
+      toast.success(`✅ ${totalUploaded} classes uploaded, ${totalSkipped} skipped (duplicates).`);
+      setBulkFile(null);
+      await fetchClasses();
+    } catch (err) {
+      console.error("Bulk class upload failed", err);
+      const backendMsg = err.response?.data?.error;
+      toast.error(backendMsg ? `Bulk upload failed: ${backendMsg}` : "Bulk upload failed");
+    } finally {
+      setBulkUploading(false);
     }
   };
 
@@ -128,6 +181,11 @@ export default function ClassesPage() {
       await deleteClass(id);
       toast.success("🗑️ Class deleted");
       await fetchClasses();
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     } catch (err) {
       console.error("Error deleting class", err);
       const backendMsg = err.response?.data?.error;
@@ -136,10 +194,10 @@ export default function ClassesPage() {
         : "Failed to delete class";
       setError(finalMsg);
       toast.error(finalMsg);
-
     }
   };
 
+  // ===== Filters / sorting =====
   const letters = ["", ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""), "0-9"];
 
   const divisionOptions = useMemo(() => {
@@ -181,6 +239,89 @@ export default function ClassesPage() {
     });
     return list;
   }, [classes, search, divisionFilter, startsWith, sortBy, sortDir]);
+
+  // ===== Selection helpers =====
+  const filteredIds = useMemo(() => filtered.map((c) => String(c._id)), [filtered]);
+
+  const allOnPageSelected = useMemo(() => {
+    if (!filteredIds.length) return false;
+    return filteredIds.every((id) => selectedIds.has(id));
+  }, [filteredIds, selectedIds]);
+
+  const someOnPageSelected = useMemo(() => {
+    if (!filteredIds.length) return false;
+    return filteredIds.some((id) => selectedIds.has(id)) && !allOnPageSelected;
+  }, [filteredIds, selectedIds, allOnPageSelected]);
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const s = String(id);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        filteredIds.forEach((id) => next.delete(id));
+      } else {
+        filteredIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  // ===== Bulk delete handler =====
+  const handleBulkDeleteSelected = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) {
+      toast.info("No classes selected.");
+      return;
+    }
+
+    const ok = await confirm({
+      title: `Delete ${ids.length} selected ${ids.length === 1 ? "class" : "classes"}`,
+      message:
+        "This will remove the classes, detach their students, and pull the class from professors. This action cannot be undone.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    try {
+      setBulkDeleting(true);
+      const { success, failed } = await batchDeleteClassesClient(ids, {
+        onProgress: ({ done, total }) => {
+          // optional: could be wired to a progress UI
+          // console.debug(`Bulk deleting ${done}/${total}`);
+        },
+      });
+
+      if (success.length) {
+        toast.success(`🗑️ Deleted ${success.length} ${success.length === 1 ? "class" : "classes"}.`);
+      }
+      if (failed.length) {
+        toast.error(`⚠️ Failed to delete ${failed.length} item(s).`);
+        console.error("Bulk delete failed items:", failed);
+      }
+
+      clearSelection();
+      await fetchClasses();
+    } catch (err) {
+      console.error("Bulk delete error:", err);
+      const backendMsg = err?.response?.data?.error;
+      toast.error(backendMsg ? `Bulk delete failed: ${backendMsg}` : "Bulk delete failed");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   const resetControls = () => {
     setSearch("");
@@ -281,6 +422,68 @@ export default function ClassesPage() {
           Showing <span className="font-semibold">{filtered.length}</span> of{" "}
           <span className="font-semibold">{Array.isArray(classes) ? classes.length : 0}</span> classes
         </div>
+
+        {/* ✅ Bulk selection toolbar */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={toggleSelectAllOnPage}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            disabled={!filtered.length}
+            title={allOnPageSelected ? "Unselect all on page" : "Select all on page"}
+          >
+            {allOnPageSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+            {allOnPageSelected ? "Unselect All (visible)" : "Select All (visible)"}
+          </button>
+
+          <button
+            onClick={clearSelection}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50"
+            disabled={!selectedIds.size}
+            title="Clear selection"
+          >
+            Clear Selection
+          </button>
+
+          <button
+            onClick={handleBulkDeleteSelected}
+            className="px-3 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 flex items-center gap-2 disabled:opacity-60"
+            disabled={!selectedIds.size || bulkDeleting}
+            title="Delete selected"
+          >
+            {bulkDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+            {bulkDeleting ? "Deleting..." : `Delete Selected (${selectedIds.size})`}
+          </button>
+        </div>
+      </div>
+
+      {/* Bulk Upload Classes */}
+      <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
+        <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Classes</h2>
+        <div className="flex flex-col md:flex-row gap-3 items-center">
+          <input
+            type="file"
+            accept=".xlsx, .xls"
+            onChange={(e) => setBulkFile(e.target.files[0])}
+            className="border rounded-lg px-3 py-2"
+            disabled={bulkUploading}
+          />
+          <button
+            onClick={handleBulkUpload}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 disabled:opacity-60"
+            disabled={bulkUploading}
+          >
+            {bulkUploading ? (
+              <>
+                <Loader2 className="animate-spin" size={16} /> Uploading...
+              </>
+            ) : (
+              "Upload"
+            )}
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mt-1">
+          Only Excel files (.xlsx, .xls) with <strong>className</strong> and <strong>division</strong> columns are supported.
+        </p>
       </div>
 
       {/* Add Class Form */}
@@ -333,6 +536,18 @@ export default function ClassesPage() {
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-purple-100 text-left">
+                {/* ✅ Select checkbox header */}
+                <th className="p-3 w-10">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible"
+                    checked={allOnPageSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someOnPageSelected;
+                    }}
+                    onChange={toggleSelectAllOnPage}
+                  />
+                </th>
                 <th className="p-3">🆔 Class ID</th>
                 <th className="p-3">🏫 Class Name</th>
                 <th className="p-3">📌 Division</th>
@@ -340,106 +555,119 @@ export default function ClassesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((cls) => (
-                <tr key={cls._id} className="border-b hover:bg-gray-50 transition">
-                  {/* Class ID always displayed as non-editable text */}
-                  <td className="p-3">{cls.classId}</td>
-
-                  <td className="p-3">
-                    {editClassId === cls._id ? (
+              {filtered.map((cls) => {
+                const isSelected = selectedIds.has(String(cls._id));
+                return (
+                  <tr key={cls._id} className="border-b hover:bg-gray-50 transition">
+                    {/* ✅ Row checkbox */}
+                    <td className="p-3">
                       <input
-                        value={cls.className}
-                        onChange={(e) =>
-                          setClasses((prev) =>
-                            prev.map((c) =>
-                              c._id === cls._id ? { ...c, className: e.target.value } : c
-                            )
-                          )
-                        }
-                        className="px-2 py-1 border rounded-lg"
-                        disabled={savingId === cls._id}
+                        type="checkbox"
+                        aria-label={`Select ${cls.className}`}
+                        checked={isSelected}
+                        onChange={() => toggleSelectOne(cls._id)}
                       />
-                    ) : (
-                      cls.className
-                    )}
-                  </td>
+                    </td>
 
-                  <td className="p-3">
-                    {editClassId === cls._id ? (
-                      <input
-                        value={cls.division}
-                        onChange={(e) =>
-                          setClasses((prev) =>
-                            prev.map((c) =>
-                              c._id === cls._id ? { ...c, division: e.target.value } : c
+                    {/* Class ID always displayed as non-editable text */}
+                    <td className="p-3">{cls.classId}</td>
+
+                    <td className="p-3">
+                      {editClassId === cls._id ? (
+                        <input
+                          value={cls.className}
+                          onChange={(e) =>
+                            setClasses((prev) =>
+                              prev.map((c) =>
+                                c._id === cls._id ? { ...c, className: e.target.value } : c
+                              )
                             )
-                          )
-                        }
-                        className="px-2 py-1 border rounded-lg"
-                        disabled={savingId === cls._id}
-                      />
-                    ) : (
-                      cls.division
-                    )}
-                  </td>
+                          }
+                          className="px-2 py-1 border rounded-lg"
+                          disabled={savingId === cls._id}
+                        />
+                      ) : (
+                        cls.className
+                      )}
+                    </td>
 
-                  <td className="p-3 flex gap-2">
-                    {editClassId === cls._id ? (
-                      <>
-                        <button
-                          onClick={() => handleUpdateClass(cls._id)}
-                          className="px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-1 disabled:opacity-60"
+                    <td className="p-3">
+                      {editClassId === cls._id ? (
+                        <input
+                          value={cls.division}
+                          onChange={(e) =>
+                            setClasses((prev) =>
+                              prev.map((c) =>
+                                c._id === cls._id ? { ...c, division: e.target.value } : c
+                              )
+                            )
+                          }
+                          className="px-2 py-1 border rounded-lg"
                           disabled={savingId === cls._id}
-                        >
-                          {savingId === cls._id ? (
-                            <>
-                              <Loader2 className="animate-spin" size={14} /> Saving...
-                            </>
-                          ) : (
-                            "✅ Save"
-                          )}
-                        </button>
-                        <button
-                          onClick={() => setEditClassId(null)}
-                          className="px-3 py-1 bg-gray-400 text-white rounded-lg hover:bg-gray-500 flex items-center gap-1"
-                          disabled={savingId === cls._id}
-                        >
-                          <XCircle size={16} /> Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => {
-                            // micro loading indicator when entering edit mode
-                            setEditLoadingId(cls._id);
-                            setTimeout(() => {
-                              setEditClassId(cls._id);
-                              setEditLoadingId(null);
-                            }, 120);
-                          }}
-                          className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-60"
-                          disabled={savingId !== null}
-                        >
-                          {editLoadingId === cls._id ? (
-                            <Loader2 className="animate-spin" size={14} />
-                          ) : (
-                            <Edit size={16} />
-                          )}
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClass(cls._id)}
-                          className="flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                          disabled={savingId !== null}
-                        >
-                          <XCircle size={16} /> Delete
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        />
+                      ) : (
+                        cls.division
+                      )}
+                    </td>
+
+                    <td className="p-3 flex gap-2">
+                      {editClassId === cls._id ? (
+                        <>
+                          <button
+                            onClick={() => handleUpdateClass(cls._id)}
+                            className="px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-1 disabled:opacity-60"
+                            disabled={savingId === cls._id}
+                          >
+                            {savingId === cls._id ? (
+                              <>
+                                <Loader2 className="animate-spin" size={14} /> Saving...
+                              </>
+                            ) : (
+                              "✅ Save"
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setEditClassId(null)}
+                            className="px-3 py-1 bg-gray-400 text-white rounded-lg hover:bg-gray-500 flex items-center gap-1"
+                            disabled={savingId === cls._id}
+                          >
+                            <XCircle size={16} /> Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => {
+                              // micro loading indicator when entering edit mode
+                              setEditLoadingId(cls._id);
+                              setTimeout(() => {
+                                setEditClassId(cls._id);
+                                setEditLoadingId(null);
+                              }, 120);
+                            }}
+                            className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-60"
+                            disabled={savingId !== null}
+                          >
+                            {editLoadingId === cls._id ? (
+                              <Loader2 className="animate-spin" size={14} />
+                            ) : (
+                              <Edit size={16} />
+                            )}
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClass(cls._id)}
+                            className="flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                            disabled={savingId !== null}
+                          >
+                            <XCircle size={16} /> Delete
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

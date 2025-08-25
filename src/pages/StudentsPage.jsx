@@ -1,5 +1,5 @@
 // src/pages/StudentPage.jsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   getStudents,
   getStudentById,
@@ -14,13 +14,25 @@ import { toast } from "react-toastify";
 import { useConfirm } from "../components/ConfirmProvider";
 import BatchUpdateModal from "../components/BatchUpdateModal";
 import BatchProgress from "../components/BatchProgress";
-import { XCircle } from "lucide-react";
+import {
+  XCircle,
+  Search,
+  Filter,
+  RefreshCw,
+  SortAsc,
+  SortDesc,
+  Loader2,
+  PlusCircle,
+  Trash2,
+  CheckSquare,
+  Square,
+} from "lucide-react";
 
-const StudentPage = () => {
+export default function StudentPage() {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null); // inline editor model
   const [loading, setLoading] = useState(false);
-  const [file, setFile] = useState(null);
+  const [bulkFile, setBulkFile] = useState(null);
 
   const [newStudent, setNewStudent] = useState({
     name: "",
@@ -30,9 +42,8 @@ const StudentPage = () => {
   });
   const [adding, setAdding] = useState(false);
 
-  // selection + batch UI state
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [showSelection, setShowSelection] = useState(false); // controls checkbox visibility
+  // selection + batch UI state (use Set for efficiency)
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -51,27 +62,49 @@ const StudentPage = () => {
 
   const [uploading, setUploading] = useState(false);
   const [batchUpdating, setBatchUpdating] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const [error, setError] = useState("");
 
   const confirm = useConfirm();
+  const headerCheckboxRef = useRef(null);
 
   // Fetch all students
   const fetchStudents = async () => {
     setLoading(true);
     try {
       const data = await getStudents();
-      setStudents(data || []);
+      // getStudents returns either array or response; handle both
+      const arr = Array.isArray(data) ? data : data?.data?.students || data?.students || data?.data || [];
+      setStudents(arr);
     } catch (err) {
       console.error("Error fetching students:", err);
       toast.error("Failed to fetch students");
+      setStudents([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
     fetchStudents();
   }, []);
+
+  // keep selection trimmed to available ids
+  useEffect(() => {
+    if (!Array.isArray(students) || students.length === 0) {
+      if (selectedIds.size) setSelectedIds(new Set());
+      return;
+    }
+    const valid = new Set(students.map((s) => String(s._id)));
+    const next = new Set();
+    let changed = false;
+    selectedIds.forEach((id) => {
+      if (valid.has(id)) next.add(id);
+      else changed = true;
+    });
+    if (changed) setSelectedIds(next);
+  }, [students]); // eslint-disable-line
 
   const handleAddStudent = async () => {
     if (!newStudent.name || !newStudent.enrollmentNumber || !newStudent.semester) {
@@ -84,7 +117,7 @@ const StudentPage = () => {
       await addStudent(newStudent);
       toast.success("✅ Student added!");
       setNewStudent({ name: "", enrollmentNumber: "", semester: "", division: "" });
-      fetchStudents();
+      await fetchStudents();
     } catch (err) {
       console.error("Error adding student:", err);
       const backendMsg = err.response?.data?.error;
@@ -96,21 +129,18 @@ const StudentPage = () => {
     }
   };
 
-
   // Handle inline edit open (per-card loading)
   const handleEdit = async (id) => {
     try {
       setEditingId(id);
-      setSelectedStudent(null); // clear any previous inline model while we fetch
+      setSelectedStudent(null);
       const student = await getStudentById(id);
       const s = student?.student || student;
       setSelectedStudent(s);
     } catch (err) {
       console.error("Error fetching student:", err);
       const backendMsg = err.response?.data?.error;
-      const finalMsg = backendMsg
-        ? `Failed to load student: ${backendMsg}`
-        : "Failed to load student details";
+      const finalMsg = backendMsg ? `Failed to load student: ${backendMsg}` : "Failed to load student details";
       setError(finalMsg);
       toast.error(finalMsg);
     } finally {
@@ -131,13 +161,11 @@ const StudentPage = () => {
       });
       toast.success("✅ Student updated!");
       setSelectedStudent(null);
-      fetchStudents();
+      await fetchStudents();
     } catch (err) {
       console.error("Error updating student:", err);
       const backendMsg = err.response?.data?.error;
-      const finalMsg = backendMsg
-        ? `Failed to update student: ${backendMsg}`
-        : "Failed to update student";
+      const finalMsg = backendMsg ? `Failed to update student: ${backendMsg}` : "Failed to update student";
       setError(finalMsg);
       toast.error(finalMsg);
     } finally {
@@ -160,16 +188,17 @@ const StudentPage = () => {
     try {
       await deleteStudent(id);
       toast.success("🗑️ Student deleted!");
-      // remove from selection if needed
-      setSelectedIds((prev) => prev.filter((x) => x !== String(id)));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(String(id));
+        return next;
+      });
       if (selectedStudent && selectedStudent._id === id) setSelectedStudent(null);
-      fetchStudents();
+      await fetchStudents();
     } catch (err) {
       console.error("Error deleting student:", err);
       const backendMsg = err.response?.data?.error;
-      const finalMsg = backendMsg
-        ? `Failed to delete student: ${backendMsg}`
-        : "Failed to delete student";
+      const finalMsg = backendMsg ? `Failed to delete student: ${backendMsg}` : "Failed to delete student";
       setError(finalMsg);
       toast.error(finalMsg);
     }
@@ -177,43 +206,44 @@ const StudentPage = () => {
 
   // Handle bulk upload
   const handleBulkUpload = async () => {
-    if (!file) {
+    if (!bulkFile) {
       toast.error("📂 Please select an Excel file first!");
       return;
     }
     try {
       setUploading(true);
-      await bulkUploadStudents(file);
-      toast.success("✅ Bulk upload successful!");
-      setFile(null);
-      fetchStudents();
+      const res = await bulkUploadStudents(bulkFile);
+      console.log("Bulk upload result:", res);
+      const totalUploaded = res?.totalUploaded ?? res?.inserted ?? (Array.isArray(res) ? res.length : 0);
+      toast.success(`✅ Bulk upload finished. ${totalUploaded} added.`);
+      setBulkFile(null);
+      await fetchStudents();
+      console.log("Bulk upload result:", res);
     } catch (err) {
       console.error("Error bulk uploading:", err);
       const backendMsg = err.response?.data?.error;
-      const finalMsg = backendMsg
-        ? `Bulk upload failed: ${backendMsg}`
-        : "Bulk upload failed";
-      setError(finalMsg)
+      const finalMsg = backendMsg ? `Bulk upload failed: ${backendMsg}` : "Bulk upload failed";
+      setError(finalMsg);
       toast.error(finalMsg);
     } finally {
       setUploading(false);
     }
-
   };
 
   // Client-side batch apply handler (uses batchUpdateStudentsClient)
   const handleApplyBatch = async (updates) => {
-    if (!selectedIds.length) {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) {
       toast.error("No students selected for batch update");
       return;
     }
 
-    setProgress({ done: 0, total: selectedIds.length });
+    setProgress({ done: 0, total: ids.length });
     setProgressOpen(true);
     setBatchUpdating(true);
 
     try {
-      const res = await batchUpdateStudentsClient(selectedIds, updates, {
+      const res = await batchUpdateStudentsClient(ids, updates, {
         concurrency: 5,
         onProgress: ({ done, total }) => setProgress({ done, total }),
       });
@@ -225,41 +255,40 @@ const StudentPage = () => {
         console.table(res.failed);
       }
       setBatchModalOpen(false);
-      setSelectedIds([]);
-      setShowSelection(false);
-      fetchStudents();
+      setSelectedIds(new Set());
+      await fetchStudents();
     } catch (err) {
       console.error("Batch update error", err);
       toast.error("Batch update failed");
     } finally {
       setBatchUpdating(false);
-      // keep progress visible until user closes
     }
   };
 
-  // Batch delete handler
+  // Batch delete handler (single API call)
   const handleBatchDelete = async () => {
-    if (!selectedIds.length) {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) {
       toast.error("No students selected for deletion");
       return;
     }
 
     const ok = await confirm({
-      title: "Delete Students",
-      message: `Are you sure you want to delete ${selectedIds.length} students? This action cannot be undone.`,
-      confirmText: "Delete All",
+      title: `Delete ${ids.length} selected ${ids.length === 1 ? "student" : "students"}`,
+      message:
+        "This will permanently delete selected students. This action cannot be undone.",
+      confirmText: "Delete",
       cancelText: "Cancel",
       tone: "danger",
     });
     if (!ok) return;
 
-    setProgress({ done: 0, total: selectedIds.length });
+    setProgress({ done: 0, total: ids.length });
     setProgressOpen(true);
-    setBatchUpdating(true);
+    setBulkDeleting(true);
 
     try {
-      const res = await batchDeleteStudentsClient(selectedIds, {
-        concurrency: 5,
+      const res = await batchDeleteStudentsClient(ids, {
         onProgress: ({ done, total }) => setProgress({ done, total }),
       });
 
@@ -269,15 +298,13 @@ const StudentPage = () => {
         toast.warn(`Deleted ${res.success.length}, failed ${res.failed.length}. Check console for details.`);
         console.table(res.failed);
       }
-
-      setSelectedIds([]);
-      setShowSelection(false);
-      fetchStudents();
+      setSelectedIds(new Set());
+      await fetchStudents();
     } catch (err) {
       console.error("Batch delete error", err);
       toast.error("Batch delete failed");
     } finally {
-      setBatchUpdating(false);
+      setBulkDeleting(false);
     }
   };
 
@@ -285,18 +312,15 @@ const StudentPage = () => {
   const filteredStudents = useMemo(() => {
     return students
       .filter((s) => {
-        if (searchName && !s.name.toLowerCase().includes(searchName.toLowerCase())) return false;
-        if (
-          searchEnrollment &&
-          !(s.enrollmentNumber || "").toLowerCase().includes(searchEnrollment.toLowerCase())
-        ) return false;
+        if (searchName && !(s.name || "").toLowerCase().includes(searchName.toLowerCase())) return false;
+        if (searchEnrollment && !((s.enrollmentNumber || "").toLowerCase().includes(searchEnrollment.toLowerCase()))) return false;
         if (filterSemester && Number(s.semester) !== Number(filterSemester)) return false;
         if (filterDivision && (s.division || "") !== filterDivision) return false;
         return true;
       })
       .sort((a, b) => {
         if (sortBy === "name") {
-          return a.name.localeCompare(b.name);
+          return (a.name || "").localeCompare(b.name || "");
         } else if (sortBy === "enrollment") {
           return (a.enrollmentNumber || "").localeCompare(b.enrollmentNumber || "");
         } else if (sortBy === "semester") {
@@ -306,377 +330,377 @@ const StudentPage = () => {
       });
   }, [students, searchName, searchEnrollment, filterSemester, filterDivision, sortBy]);
 
-  const visibleStudents = useMemo(() => {
-    return filteredStudents.slice(0, visibleCount);
-  }, [filteredStudents, visibleCount]);
-
+  const visibleStudents = useMemo(() => filteredStudents.slice(0, visibleCount), [filteredStudents, visibleCount]);
 
   const divisionOptions = useMemo(() => {
     const set = new Set(students.map((s) => s.division).filter(Boolean));
     return ["", ...Array.from(set).sort()];
   }, [students]);
 
-  // ---------- Select visible helpers ----------
-  const visibleIds = useMemo(() => filteredStudents.map((s) => String(s._id)), [filteredStudents]);
+  // Selection helpers (mirror Professors page)
+  const filteredIds = useMemo(() => filteredStudents.map((c) => String(c._id)), [filteredStudents]);
 
-  const areAllVisibleSelected = useMemo(() => {
-    if (visibleIds.length === 0) return false;
-    return visibleIds.every((id) => selectedIds.includes(id));
-  }, [visibleIds, selectedIds]);
+  const allOnPageSelected = useMemo(() => {
+    if (!filteredIds.length) return false;
+    return filteredIds.every((id) => selectedIds.has(id));
+  }, [filteredIds, selectedIds]);
 
-  const toggleSelectVisible = () => {
-    if (areAllVisibleSelected) {
-      // unselect visible
-      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
-    } else {
-      // add visible ids
-      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
-      setShowSelection(true);
-    }
+  const someOnPageSelected = useMemo(() => {
+    if (!filteredIds.length) return false;
+    return filteredIds.some((id) => selectedIds.has(id)) && !allOnPageSelected;
+  }, [filteredIds, selectedIds, allOnPageSelected]);
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) headerCheckboxRef.current.indeterminate = someOnPageSelected;
+  }, [someOnPageSelected]);
+
+  const toggleSelectOne = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const s = String(id);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
   };
 
-  const selectAllVisible = () => {
-    setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
-    setShowSelection(true);
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        filteredIds.forEach((id) => next.delete(id));
+      } else {
+        filteredIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
   };
 
-  const clearSelection = () => {
-    setSelectedIds([]);
-    setShowSelection(false);
-  };
+  const clearSelection = () => setSelectedIds(new Set());
 
   return (
     <div className="p-6 min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      <h2 className="text-3xl font-bold mb-6 flex items-center gap-2 text-purple-700">
-        📚 Student Management
-      </h2>
+      <h1 className="text-3xl font-extrabold text-purple-700 mb-6 flex items-center gap-2">📚 Student Management</h1>
 
-      {/* Add single student */}
-      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md">
-        <h3 className="text-lg font-semibold mb-3">➕ Add Single Student</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {/* Error banner */}
+      {error && (
+        <div className="mb-4 flex items-center justify-between bg-red-100 text-red-700 p-3 rounded-lg">
+          <span>{error}</span>
+          <button onClick={() => setError("")} className="text-red-700 hover:text-red-900">
+            <XCircle size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* Controls: Search + Filters + Sort */}
+      <div className="bg-white border rounded-2xl shadow-sm p-4 mb-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} />
+            <input
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              placeholder="Search by name..."
+              className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter size={18} className="text-purple-600" />
+            <input
+              type="text"
+              placeholder="Search by enrollment..."
+              value={searchEnrollment}
+              onChange={(e) => setSearchEnrollment(e.target.value)}
+              className="border rounded-lg px-3 py-2"
+            />
+
+            <select
+              value={filterDivision}
+              onChange={(e) => setFilterDivision(e.target.value)}
+              className="border rounded-lg px-3 py-2"
+              title="Filter by division"
+            >
+              {divisionOptions.map((d, i) => (
+                <option key={i} value={d}>
+                  {d === "" ? "All Divisions" : `Division ${d}`}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="border rounded-lg px-3 py-2"
+              title="Sort by"
+            >
+              <option value="name">Sort by Name</option>
+              <option value="enrollment">Sort by Enrollment</option>
+              <option value="semester">Sort by Semester</option>
+            </select>
+
+            <button
+              onClick={() => setSortBy((s) => s === "name" ? "enrollment" : "name")}
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+              title="Toggle sort field"
+            >
+              <SortAsc size={16} /> {sortBy}
+            </button>
+
+            <button
+              onClick={() => {
+                setSearchName("");
+                setSearchEnrollment("");
+                setFilterSemester("");
+                setFilterDivision("");
+                setSortBy("name");
+              }}
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+              title="Reset"
+            >
+              <RefreshCw size={16} /> Reset
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-1 text-sm text-gray-600">
+          Showing <span className="font-semibold">{filteredStudents.length}</span> of{" "}
+          <span className="font-semibold">{Array.isArray(students) ? students.length : 0}</span> students
+        </div>
+
+        {/* Bulk toolbar */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={toggleSelectAllOnPage}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            disabled={!filteredStudents.length}
+            title={allOnPageSelected ? "Unselect all visible" : "Select all visible"}
+          >
+            {allOnPageSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+            {allOnPageSelected ? "Unselect All (visible)" : "Select All (visible)"}
+          </button>
+
+          <button
+            onClick={clearSelection}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50"
+            disabled={selectedIds.size === 0}
+          >
+            Clear Selection
+          </button>
+
+          <button
+            onClick={() => setBatchModalOpen(true)}
+            disabled={selectedIds.size === 0 || batchUpdating}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-60"
+          >
+            {batchUpdating ? <Loader2 className="animate-spin" size={16} /> : "🛠️ Batch Update"}
+            <span className="ml-1">({selectedIds.size})</span>
+          </button>
+
+          <button
+            onClick={handleBatchDelete}
+            disabled={selectedIds.size === 0 || bulkDeleting}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 disabled:opacity-60"
+          >
+            {bulkDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+            <span className="ml-1">Delete Selected ({selectedIds.size})</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Bulk Upload Students */}
+      <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
+        <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Students</h2>
+        <div className="flex flex-col md:flex-row gap-3 items-center">
+          <input
+            type="file"
+            accept=".xlsx, .xls, .csv"
+            onChange={(e) => setBulkFile(e.target.files[0])}
+            className="border rounded-lg px-3 py-2"
+            disabled={uploading}
+          />
+          <button
+            onClick={handleBulkUpload}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 disabled:opacity-60"
+            disabled={uploading}
+          >
+            {uploading ? (
+              <>
+                <Loader2 className="animate-spin" size={16} /> Uploading...
+              </>
+            ) : (
+              "Upload"
+            )}
+          </button>
+        </div>
+        <p className="text-sm text-gray-500 mt-1">
+          Only Excel files (.xlsx, .xls) with <strong>Name, Enrollment Number, Semester,</strong> and <strong>Division</strong> (optional) columns are supported.
+        </p>
+      </div>
+
+      {/* Add Single Student */}
+      <div className="mb-6 bg-white p-6 rounded-2xl shadow-md">
+        <h2 className="text-lg font-semibold text-purple-700 mb-4 flex items-center gap-2">
+          <PlusCircle /> Add Single Student
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <input
             type="text"
             placeholder="Name"
             value={newStudent.name}
             onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-            className="border p-2 rounded-lg shadow"
+            className="px-4 py-2 border rounded-lg"
           />
           <input
             type="text"
             placeholder="Enrollment Number"
             value={newStudent.enrollmentNumber}
-            onChange={(e) =>
-              setNewStudent({ ...newStudent, enrollmentNumber: e.target.value })
-            }
-            className="border p-2 rounded-lg shadow"
+            onChange={(e) => setNewStudent({ ...newStudent, enrollmentNumber: e.target.value })}
+            className="px-4 py-2 border rounded-lg"
           />
           <input
             type="number"
             placeholder="Semester"
             value={newStudent.semester}
             onChange={(e) => setNewStudent({ ...newStudent, semester: e.target.value })}
-            className="border p-2 rounded-lg shadow"
+            className="px-4 py-2 border rounded-lg"
           />
           <input
             type="text"
             placeholder="Division (optional)"
             value={newStudent.division}
             onChange={(e) => setNewStudent({ ...newStudent, division: e.target.value })}
-            className="border p-2 rounded-lg shadow"
+            className="px-4 py-2 border rounded-lg"
           />
         </div>
-        <button
-          className="mt-4 px-4 py-2 bg-green-600 text-white rounded-xl shadow hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleAddStudent}
-          disabled={adding}
-        >
-          {adding ? "⏳ Adding..." : "➕ Add Student"}
-        </button>
-      </div>
-
-      {/* Bulk upload */}
-      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md flex items-center gap-4">
-        <input
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          onChange={(e) => setFile(e.target.files[0])}
-          className="border rounded p-2"
-        />
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-xl shadow hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleBulkUpload}
-          disabled={uploading}
-        >
-          {uploading ? "⏳ Uploading..." : "⬆️ Upload Excel"}
-        </button>
-
-      </div>
-
-      {/* Batch controls */}
-      <div className="mb-4 flex items-center gap-3 flex-wrap">
-        <button
-          onClick={() => setBatchModalOpen(true)}
-          disabled={selectedIds.length === 0 || batchUpdating}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {batchUpdating
-            ? "⏳ Updating..."
-            : `🛠️ Batch Update (${selectedIds.length})`}
-        </button>
-
-        <button
-          onClick={handleBatchDelete}
-          disabled={selectedIds.length === 0 || batchUpdating}
-          className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {batchUpdating ? "⏳ Deleting..." : `🗑️ Batch Delete (${selectedIds.length})`}
-        </button>
-
-        <button
-          onClick={clearSelection}
-          className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition"
-        >
-          Clear selection
-        </button>
-
-        <button
-          onClick={toggleSelectVisible}
-          className={`px-3 py-2 rounded-lg border transition ${areAllVisibleSelected ? "bg-gray-100" : "hover:bg-gray-50"}`}
-        >
-          {areAllVisibleSelected ? "Unselect visible" : `Select visible (${visibleIds.length})`}
-        </button>
-
-        <button
-          onClick={selectAllVisible}
-          className="px-3 py-2 rounded-lg border hover:bg-gray-50 transition"
-        >
-          Select all visible
-        </button>
-
-      </div>
-
-      {/* Search & filter row */}
-      <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <input
-          type="text"
-          placeholder="🔍 Search by name..."
-          value={searchName}
-          onChange={(e) => setSearchName(e.target.value)}
-          className="border p-2 rounded-lg shadow"
-        />
-        <input
-          type="text"
-          placeholder="🔎 Search by enrollment..."
-          value={searchEnrollment}
-          onChange={(e) => setSearchEnrollment(e.target.value)}
-          className="border p-2 rounded-lg shadow"
-        />
-        <select
-          value={filterSemester}
-          onChange={(e) => setFilterSemester(e.target.value)}
-          className="border p-2 rounded-lg shadow"
-        >
-          <option value="">🎓 All Semesters</option>
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
-            <option key={sem} value={sem}>Semester {sem}</option>
-          ))}
-        </select>
-        <select
-          value={filterDivision}
-          onChange={(e) => setFilterDivision(e.target.value)}
-          className="border p-2 rounded-lg shadow"
-        >
-          {divisionOptions.map((div) => (
-            <option key={div} value={div}>
-              {div === "" ? "🏷️ All Divisions" : `Division ${div}`}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Sort controls */}
-      <div className="mb-6 flex items-center gap-4">
-        <label className="font-medium text-gray-700">Sort by:</label>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="border p-2 rounded-lg"
-        >
-          <option value="name">Name (A → Z)</option>
-          <option value="enrollment">Enrollment</option>
-          <option value="semester">Semester (low → high)</option>
-        </select>
-
-        <button
-          className="ml-auto px-3 py-1 bg-gray-200 rounded-lg"
-          onClick={() => {
-            setSearchName("");
-            setSearchEnrollment("");
-            setFilterSemester("");
-            setFilterDivision("");
-            setSortBy("name");
-          }}
-        >
-          Reset filters
-        </button>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded relative mb-4">
-          {error}
+        <div className="mt-4">
           <button
-            className="absolute top-0 bottom-0 right-0 px-4 py-2"
-            onClick={() => setError("")}
+            onClick={handleAddStudent}
+            disabled={adding}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
-            <XCircle className="w-5 h-5" />
+            {adding ? <><Loader2 className="animate-spin" size={14} /> Adding...</> : "➕ Add Student"}
           </button>
         </div>
-      )}
+      </div>
 
       {/* Student grid */}
       {loading ? (
-        <p>⏳ Loading students...</p>
+        <div className="flex items-center justify-center">
+          <Loader2 className="animate-spin text-purple-600" size={32} />
+          <span className="ml-2">Loading Students...</span>
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {visibleStudents.map((s) => {
               const sid = String(s._id);
-              const isSelected = selectedIds.includes(sid);
+              const isSelected = selectedIds.has(sid);
               const isEditing = selectedStudent && selectedStudent._id === s._id;
               const isFetchingThis = editingId === s._id;
 
               return (
-                <div
-                  key={s._id}
-                  className="bg-white rounded-2xl shadow-md p-6 hover:shadow-xl hover:scale-[1.02] transition"
-                >
-                  <div className="flex items-start gap-3">
-                    {/* show checkbox only when selection mode is enabled */}
-                    {showSelection && (
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() =>
-                          setSelectedIds((prev) =>
-                            prev.includes(sid) ? prev.filter((id) => id !== sid) : [...prev, sid]
-                          )
-                        }
-                        className="mt-1"
-                        disabled={saving} // disable selection while saving to avoid race
-                      />
-                    )}
-
-                    <div className="flex-1">
-                      <div className="text-4xl mb-2">🧑‍🎓</div>
-
-                      {isEditing ? (
-                        <>
-                          <input
-                            type="text"
-                            value={selectedStudent.name}
-                            onChange={(e) =>
-                              setSelectedStudent((st) => ({ ...st, name: e.target.value }))
-                            }
-                            className="w-full border p-2 rounded mb-2"
-                          />
-                          <input
-                            type="text"
-                            value={selectedStudent.enrollmentNumber}
-                            onChange={(e) =>
-                              setSelectedStudent((st) => ({ ...st, enrollmentNumber: e.target.value }))
-                            }
-                            className="w-full border p-2 rounded mb-2"
-                            placeholder="Enrollment Number"
-                            disabled={saving}
-                          />
-
-                          <div className="flex gap-2 mb-2">
-                            <input
-                              type="number"
-                              value={selectedStudent.semester}
-                              onChange={(e) =>
-                                setSelectedStudent((st) => ({ ...st, semester: e.target.value }))
-                              }
-                              className="border p-2 rounded flex-1"
-                              placeholder="Semester"
-                              disabled={saving}
-                            />
-                            <input
-                              type="text"
-                              value={selectedStudent.division || ""}
-                              onChange={(e) =>
-                                setSelectedStudent((st) => ({ ...st, division: e.target.value }))
-                              }
-                              className="border p-2 rounded flex-1"
-                              placeholder="Division"
-                              disabled={saving}
-                            />
-                          </div>
-
-                          <div className="flex gap-3">
-                            <button
-                              className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                              onClick={handleUpdate}
-                              disabled={saving}
-                            >
-                              {saving ? "Saving..." : "💾 Save"}
-                            </button>
-                            <button
-                              className="flex-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                              onClick={() => setSelectedStudent(null)}
-                              disabled={saving}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <h3 className="text-lg font-bold text-gray-800">{s.name}</h3>
-                          <p className="text-sm text-gray-500">🆔 {s.enrollmentNumber}</p>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">
-                              🎓 Semester {s.semester}
-                            </span>
-                            {s.division && (
-                              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                                🏷️ {s.division}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="mt-4 flex gap-3">
-                            <button
-                              className="flex-1 px-3 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                              onClick={() => handleEdit(s._id)}
-                              disabled={isFetchingThis || saving}
-                            >
-                              {isFetchingThis ? "Loading..." : "✏️ Edit"}
-                            </button>
-                            <button
-                              className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                              onClick={() => handleDelete(s._id)}
-                              disabled={saving || isFetchingThis}
-                            >
-                              🗑️ Delete
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
+                <div key={s._id} className="bg-white rounded-2xl shadow-md p-6 hover:shadow-xl transition relative">
+                  {/* selection checkbox top-right */}
+                  <div className="absolute right-3 top-3">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelectOne(s._id)}
+                      aria-label={`Select ${s.name}`}
+                    />
                   </div>
+
+                  {isEditing ? (
+                    <>
+                      <input
+                        type="text"
+                        value={selectedStudent.name}
+                        onChange={(e) => setSelectedStudent((st) => ({ ...st, name: e.target.value }))}
+                        className="w-full border p-2 rounded mb-2"
+                      />
+                      <input
+                        type="text"
+                        value={selectedStudent.enrollmentNumber}
+                        onChange={(e) => setSelectedStudent((st) => ({ ...st, enrollmentNumber: e.target.value }))}
+                        className="w-full border p-2 rounded mb-2"
+                        placeholder="Enrollment Number"
+                        disabled={saving}
+                      />
+                      <div className="flex gap-2 mb-2">
+                        <input
+                          type="number"
+                          value={selectedStudent.semester}
+                          onChange={(e) => setSelectedStudent((st) => ({ ...st, semester: e.target.value }))}
+                          className="border p-2 rounded flex-1"
+                          placeholder="Semester"
+                          disabled={saving}
+                        />
+                        <input
+                          type="text"
+                          value={selectedStudent.division || ""}
+                          onChange={(e) => setSelectedStudent((st) => ({ ...st, division: e.target.value }))}
+                          className="border p-2 rounded flex-1"
+                          placeholder="Division"
+                          disabled={saving}
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg"
+                          onClick={handleUpdate}
+                          disabled={saving}
+                        >
+                          {saving ? "Saving..." : "💾 Save"}
+                        </button>
+                        <button
+                          className="flex-1 px-3 py-2 bg-gray-400 text-white rounded-lg"
+                          onClick={() => setSelectedStudent(null)}
+                          disabled={saving}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-4xl mb-2">🧑‍🎓</div>
+                      <h3 className="text-lg font-bold text-gray-800">{s.name}</h3>
+                      <p className="text-sm text-gray-500">🆔 {s.enrollmentNumber}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">
+                          🎓 Semester {s.semester}
+                        </span>
+                        {s.division && (
+                          <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
+                            🏷️ {s.division}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex gap-3">
+                        <button
+                          className="flex-1 px-3 py-2 bg-yellow-500 text-white rounded-lg"
+                          onClick={() => handleEdit(s._id)}
+                          disabled={isFetchingThis || saving}
+                        >
+                          {isFetchingThis ? <Loader2 className="animate-spin" size={14} /> : "✏️ Edit"}
+                        </button>
+                        <button
+                          className="flex-1 px-3 py-2 bg-red-600 text-white rounded-lg"
+                          onClick={() => handleDelete(s._id)}
+                          disabled={saving || isFetchingThis}
+                        >
+                          🗑️ Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
-
-            {visibleStudents.length === 0 && (
-              <p className="text-gray-500 text-center col-span-full">
-                🚫 No students found
-              </p>
-            )}
           </div>
-          {/* Show More button */}
+
           {visibleCount < filteredStudents.length && (
             <div className="mt-6 flex justify-center">
               <button
@@ -705,6 +729,4 @@ const StudentPage = () => {
       />
     </div>
   );
-};
-
-export default StudentPage;
+}
