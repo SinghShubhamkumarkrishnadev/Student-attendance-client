@@ -1,6 +1,12 @@
+// src/pages/ProfessorsPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { addProfessor, getProfessors, updateProfessor, deleteProfessor } from "../services/api";
-import { PlusCircle, Edit, XCircle, User, BookOpen, Loader2, Filter, Search, RefreshCw, SortAsc, SortDesc } from "lucide-react";
+import {
+  PlusCircle, Edit, XCircle, User, BookOpen, Loader2,
+  Filter, Search, RefreshCw, SortAsc, SortDesc
+} from "lucide-react";
+import { toast } from "react-toastify";
+import { useConfirm } from "../components/ConfirmProvider";
 
 export default function ProfessorsPage() {
   const [professors, setProfessors] = useState([]);
@@ -15,6 +21,13 @@ export default function ProfessorsPage() {
   const [sortBy, setSortBy] = useState("name"); // "name" | "username"
   const [sortDir, setSortDir] = useState("asc"); // "asc" | "desc"
 
+  // button-specific loading states
+  const [adding, setAdding] = useState(false);
+  const [editLoadingId, setEditLoadingId] = useState(null); // shows brief spinner on Edit click
+  const [savingId, setSavingId] = useState(null); // id of professor being saved
+
+  const confirm = useConfirm();
+
   useEffect(() => {
     fetchProfessors();
   }, []);
@@ -24,11 +37,11 @@ export default function ProfessorsPage() {
       setLoading(true);
       setError("");
       const res = await getProfessors();
-      // keep your existing response shape usage
       setProfessors(res?.data?.professors || []);
     } catch (err) {
       console.error(err);
       setError("⚠️ Failed to load professors");
+      toast.error("⚠️ Failed to load professors");
       setProfessors([]);
     } finally {
       setLoading(false);
@@ -38,32 +51,73 @@ export default function ProfessorsPage() {
   const handleAddProfessor = async (e) => {
     e.preventDefault();
     try {
+      setAdding(true);
       await addProfessor(form);
+      toast.success("✅ Professor added");
       setForm({ name: "", username: "", password: "" });
-      fetchProfessors();
-    } catch {
-      setError("❌ Failed to add professor");
+      await fetchProfessors();
+    } catch (err) {
+      console.error("add error", err);
+      const backendMsg = err.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `Failed to add professor: ${backendMsg}`
+        : "Failed to add professor";
+
+      setError(finalMsg);
+      toast.error(finalMsg);
+    } finally {
+      setAdding(false);
     }
   };
 
   const handleUpdateProfessor = async (id) => {
     try {
+      setSavingId(id);
       const prof = professors.find((p) => p._id === id);
+      if (!prof) throw new Error("Professor not found");
       await updateProfessor(id, { name: prof.name, username: prof.username });
+      toast.success("✅ Professor updated");
       setEditId(null);
-      fetchProfessors();
-    } catch {
-      setError("❌ Failed to update professor");
+      await fetchProfessors();
+    } catch (err) {
+      console.error("update error", err);
+      const backendMsg = err.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `Failed to update professor: ${backendMsg}`
+        : "Failed to update professor";
+
+      setError(finalMsg);
+      toast.error(finalMsg);
+    } finally {
+      setSavingId(null);
     }
   };
 
   const handleDeleteProfessor = async (id) => {
-    if (!window.confirm("Are you sure?")) return;
+    const prof = professors.find((p) => p._id === id);
+    const ok = await confirm({
+      title: "Delete Professor",
+      message: `Are you sure you want to delete "${prof?.name || "this professor"}"? This action cannot be undone.`,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      tone: "danger",
+    });
+    if (!ok) return;
+
     try {
       await deleteProfessor(id);
-      fetchProfessors();
-    } catch {
-      setError("❌ Failed to delete professor");
+      toast.success("🗑️ Professor deleted");
+      await fetchProfessors();
+    } catch (err) {
+      console.error("delete error", err);
+      const backendMsg = err.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `Failed to delete professor: ${backendMsg}`
+        : "Failed to delete professor";
+
+      setError(finalMsg);
+      toast.error(finalMsg);
+
     }
   };
 
@@ -119,6 +173,7 @@ export default function ProfessorsPage() {
         👩‍🏫 Manage Professors
       </h1>
 
+      {/* Keep old error banner logic */}
       {error && <div className="mb-4 bg-red-100 text-red-700 p-3 rounded-lg">{error}</div>}
 
       {/* Controls: Search + Filters + Sort */}
@@ -198,6 +253,7 @@ export default function ProfessorsPage() {
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
             required
+            disabled={adding}
           />
           <input
             type="text"
@@ -206,6 +262,7 @@ export default function ProfessorsPage() {
             onChange={(e) => setForm({ ...form, username: e.target.value })}
             className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
             required
+            disabled={adding}
           />
           <input
             type="password"
@@ -214,12 +271,22 @@ export default function ProfessorsPage() {
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
             required
+            disabled={adding}
           />
           <button
             type="submit"
-            className="md:col-span-3 bg-purple-600 hover:bg-purple-700 transition text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2"
+            className="md:col-span-3 bg-purple-600 hover:bg-purple-700 transition text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
+            disabled={adding}
           >
-            <PlusCircle /> Add Professor
+            {adding ? (
+              <>
+                <Loader2 className="animate-spin" size={16} /> Adding...
+              </>
+            ) : (
+              <>
+                <PlusCircle /> Add Professor
+              </>
+            )}
           </button>
         </form>
       </div>
@@ -250,6 +317,7 @@ export default function ProfessorsPage() {
                       )
                     }
                     className="px-2 py-1 border rounded w-full"
+                    disabled={savingId === prof._id}
                   />
                 ) : (
                   <h3 className="text-lg font-bold text-gray-800 truncate">{prof.name}</h3>
@@ -268,6 +336,7 @@ export default function ProfessorsPage() {
                       )
                     }
                     className="px-2 py-1 border rounded w-full"
+                    disabled={savingId === prof._id}
                   />
                 ) : (
                   <span className="truncate">{prof.username}</span>
@@ -278,28 +347,51 @@ export default function ProfessorsPage() {
                   <>
                     <button
                       onClick={() => handleUpdateProfessor(prof._id)}
-                      className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm"
+                      className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-2 disabled:opacity-60"
+                      disabled={savingId === prof._id}
                     >
-                      💾 Save
+                      {savingId === prof._id ? (
+                        <>
+                          <Loader2 className="animate-spin" size={14} /> Saving...
+                        </>
+                      ) : (
+                        "💾 Save"
+                      )}
                     </button>
                     <button
                       onClick={() => setEditId(null)}
                       className="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded-lg text-sm"
+                      disabled={savingId === prof._id}
                     >
-                      ❌ Cancel
+                      Cancel
                     </button>
                   </>
                 ) : (
                   <>
                     <button
-                      onClick={() => setEditId(prof._id)}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+                      onClick={() => {
+                        // show a tiny loading indication on Edit click (useful when UI may do more in future)
+                        setEditLoadingId(prof._id);
+                        // enter edit mode on next tick so the spinner is perceptible (very short)
+                        setTimeout(() => {
+                          setEditId(prof._id);
+                          setEditLoadingId(null);
+                        }, 120);
+                      }}
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1 disabled:opacity-60"
+                      disabled={savingId !== null}
                     >
-                      <Edit size={16} /> Edit
+                      {editLoadingId === prof._id ? (
+                        <Loader2 className="animate-spin" size={14} />
+                      ) : (
+                        <Edit size={16} />
+                      )}
+                      Edit
                     </button>
                     <button
                       onClick={() => handleDeleteProfessor(prof._id)}
                       className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-sm flex items-center gap-1"
+                      disabled={savingId !== null}
                     >
                       <XCircle size={16} /> Delete
                     </button>

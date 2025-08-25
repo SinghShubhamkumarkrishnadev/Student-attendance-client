@@ -7,7 +7,6 @@ export default function ProtectedRoute({ children }) {
 
   // If we are still hydrating profile from token, don't redirect yet
   if (loading) {
-    // Return nothing or a small spinner — keep it simple:
     return null;
   }
 

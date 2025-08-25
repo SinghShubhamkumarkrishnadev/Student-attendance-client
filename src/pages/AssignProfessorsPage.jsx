@@ -6,7 +6,9 @@ import {
   assignProfessorsToClass,
   removeProfessorsFromClass,
 } from "../services/api";
-import { PlusCircle, XCircle, Search, RefreshCw } from "lucide-react";
+import { PlusCircle, XCircle, Search, RefreshCw, Loader2 } from "lucide-react";
+import { toast } from "react-toastify";
+import { useConfirm } from "../components/ConfirmProvider";
 
 export default function AssignProfessorsPage() {
   const [classes, setClasses] = useState([]);
@@ -17,6 +19,12 @@ export default function AssignProfessorsPage() {
   const [searchAvailable, setSearchAvailable] = useState("");
   const [searchAssigned, setSearchAssigned] = useState("");
   const [startsWith, setStartsWith] = useState("");
+
+  // UX loading states
+  const [assigning, setAssigning] = useState(false);
+  const [removingId, setRemovingId] = useState(null); // id of professor being removed
+
+  const confirm = useConfirm();
 
   useEffect(() => {
     fetchClasses();
@@ -46,6 +54,7 @@ export default function AssignProfessorsPage() {
     } catch (err) {
       console.error("fetchClasses error", err);
       setError("⚠️ Failed to load classes");
+      toast.error("⚠️ Failed to load classes");
     }
   };
 
@@ -57,30 +66,59 @@ export default function AssignProfessorsPage() {
     } catch (err) {
       console.error("fetchProfessors error", err);
       setError("⚠️ Failed to load professors");
+      toast.error("⚠️ Failed to load professors");
     }
   };
 
   const handleAssign = async () => {
     if (!selectedClass || selectedProfs.length === 0) return;
+    setAssigning(true);
     try {
       await assignProfessorsToClass(selectedClass, selectedProfs);
-      alert("✅ Professors assigned successfully!");
+      toast.success("✅ Professors assigned successfully!");
       setSelectedProfs([]);
       await fetchClasses(); // refresh classes to show assigned professors (populated)
     } catch (err) {
       console.error("handleAssign error", err);
-      setError("❌ Failed to assign professors");
+      const backendMsg = err.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `Failed to assign professors: ${backendMsg}`
+        : "Failed to assign professors";
+      setError(finalMsg);
+      toast.error(finalMsg);
+      setAssigning(false);
     }
   };
 
   const handleRemove = async (profId) => {
+    const cls = classes.find((c) => String(c._id) === String(selectedClass));
+    const prof = (cls?.professors || []).find((p) => String(p._id) === String(profId));
+
+    const ok = await confirm({
+      title: "Remove Professor",
+      message: `Are you sure you want to remove "${prof?.name || "this professor"}" from "${cls?.className || "the class"}"?`,
+      confirmText: "Remove",
+      cancelText: "Cancel",
+      tone: "danger",
+    });
+    if (!ok) return;
+
+    setRemovingId(String(profId));
     try {
       await removeProfessorsFromClass(selectedClass, [profId]);
-      alert("🗑 Professor removed from class");
+      toast.success("🗑 Professor removed from class");
+      // refresh authoritative state
       await fetchClasses();
     } catch (err) {
       console.error("handleRemove error", err);
-      setError("❌ Failed to remove professor");
+      const backendMsg = err.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `Failed to remove professor: ${backendMsg}`
+        : "Failed to remove professor";
+      setError(finalMsg);
+      toast.error(finalMsg);
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -88,10 +126,9 @@ export default function AssignProfessorsPage() {
   const findClassById = (id) => classes.find((c) => String(c._id) === String(id));
 
   // Available professors (all professors; no "assigned" flag on professor itself)
-  // We assume professors list is the source of truth and assigned ones are shown inside class.professors
   const availableProfessors = useMemo(() => professors.slice(), [professors]);
 
-  // filtered list based on search + startsWith (+ optional divisionFilter)
+  // filtered list based on search + startsWith
   const filteredAvailable = useMemo(() => {
     let list = professors.slice();
     const s = (searchAvailable || "").trim().toLowerCase();
@@ -117,12 +154,9 @@ export default function AssignProfessorsPage() {
       }
     }
 
-    // Removed division filtering
-
     list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     return list;
-  }, [professors, searchAvailable, startsWith, selectedClass]);
-
+  }, [professors, searchAvailable, startsWith]);
 
   // counts
   const totalCount = professors.length;
@@ -155,6 +189,7 @@ export default function AssignProfessorsPage() {
           className="border px-4 py-2 rounded-lg w-full shadow-sm"
           onChange={(e) => handleClassChange(e.target.value)}
           value={selectedClass || ""}
+          disabled={assigning || removingId !== null}
         >
           <option value="">-- Select a Class --</option>
           {classes.map((cls) => (
@@ -200,9 +235,21 @@ export default function AssignProfessorsPage() {
                 className="border pl-10 pr-4 py-2 rounded-xl w-full shadow-sm focus:ring-2 focus:ring-purple-400 outline-none"
                 value={searchAvailable}
                 onChange={(e) => setSearchAvailable(e.target.value)}
+                disabled={assigning || removingId !== null}
               />
             </div>
-
+            <div className="flex items-center gap-2 col-span-3">
+              <RefreshCw
+                className="ml-auto cursor-pointer"
+                size={18}
+                onClick={() => {
+                  if (assigning || removingId !== null) return;
+                  fetchProfessors();
+                  fetchClasses();
+                }}
+                title="Refresh lists"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -226,6 +273,7 @@ export default function AssignProfessorsPage() {
                           prev.includes(profIdStr) ? prev.filter((id) => id !== profIdStr) : [...prev, profIdStr]
                         )
                       }
+                      disabled={assigning || removingId !== null}
                     />
                     <span className="font-medium text-gray-700">{prof.name}</span>
                     <span className="text-xs text-gray-400 ml-auto">{prof.username}</span>
@@ -237,10 +285,18 @@ export default function AssignProfessorsPage() {
 
           <button
             onClick={handleAssign}
-            className="mt-6 bg-purple-600 text-white px-5 py-2 rounded-xl shadow hover:bg-purple-700 transition flex items-center gap-2"
-            disabled={selectedProfs.length === 0}
+            className="mt-6 bg-purple-600 text-white px-5 py-2 rounded-xl shadow hover:bg-purple-700 transition flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={selectedProfs.length === 0 || assigning || removingId !== null}
           >
-            <PlusCircle size={18} /> Assign Selected Professors ({selectedProfs.length})
+            {assigning ? (
+              <>
+                <Loader2 className="animate-spin" size={16} /> Assigning ({selectedProfs.length})
+              </>
+            ) : (
+              <>
+                <PlusCircle size={18} /> Assign Selected Professors ({selectedProfs.length})
+              </>
+            )}
           </button>
         </div>
       )}
@@ -258,6 +314,7 @@ export default function AssignProfessorsPage() {
               className="border pl-10 pr-4 py-2 rounded-xl w-full shadow-sm"
               value={searchAssigned}
               onChange={(e) => setSearchAssigned(e.target.value)}
+              disabled={assigning || removingId !== null}
             />
           </div>
 
@@ -265,20 +322,33 @@ export default function AssignProfessorsPage() {
             {findClassById(selectedClass)
               ?.professors
               ?.filter((prof) => (prof.name || "").toLowerCase().includes(searchAssigned.toLowerCase()))
-              .map((prof) => (
-                <li
-                  key={String(prof._id)}
-                  className="flex justify-between items-center border p-3 rounded-xl shadow-sm hover:bg-gray-50 transition"
-                >
-                  <p className="font-medium text-gray-800">{prof.name}</p>
-                  <button
-                    onClick={() => handleRemove(String(prof._id))}
-                    className="text-red-600 hover:text-red-800 flex items-center gap-1"
+              .map((prof) => {
+                const idStr = String(prof._id);
+                const removing = removingId === idStr;
+                return (
+                  <li
+                    key={idStr}
+                    className="flex justify-between items-center border p-3 rounded-xl shadow-sm hover:bg-gray-50 transition"
                   >
-                    <XCircle size={16} /> Remove
-                  </button>
-                </li>
-              ))}
+                    <p className="font-medium text-gray-800">{prof.name}</p>
+                    <button
+                      onClick={() => handleRemove(String(prof._id))}
+                      className="text-red-600 hover:text-red-800 flex items-center gap-1 disabled:opacity-60 disabled:cursor-not-allowed"
+                      disabled={assigning || removingId !== null}
+                    >
+                      {removing ? (
+                        <>
+                          <Loader2 className="animate-spin" size={14} /> Removing
+                        </>
+                      ) : (
+                        <>
+                          <XCircle size={16} /> Remove
+                        </>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
 
             {(!findClassById(selectedClass)?.professors?.length) && (
               <p className="text-gray-500 text-center">🚫 No professors assigned yet</p>

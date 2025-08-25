@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
-import { Eye, EyeOff, Building2 } from "lucide-react"; // <-- icons
+import { Eye, EyeOff, Building2, XCircle } from "lucide-react"; // <-- icons
 import { useNavigate } from "react-router-dom";
 
 export default function HodRegister() {
@@ -41,7 +41,11 @@ export default function HodRegister() {
       setMsg(res.data.message || "✅ Registered successfully, check your email for OTP.");
       setStep(2);
     } catch (err) {
-      setError(err?.response?.data?.error || "Registration failed ❌");
+      const backendMsg = err?.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `Registration failed: ${backendMsg}`
+        : "Registration failed";
+      setError(finalMsg);
     } finally {
       setLoading(false);
     }
@@ -66,7 +70,11 @@ export default function HodRegister() {
       setTimeout(() => navigate("/hod/dashboard"), 1200);
 
     } catch (err) {
-      setError(err?.response?.data?.error || "OTP verification failed ❌");
+      const backendMsg = err?.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `OTP verification failed: ${backendMsg}`
+        : "OTP verification failed";
+      setError(finalMsg);
     } finally {
       setLoading(false);
     }
@@ -91,10 +99,21 @@ export default function HodRegister() {
         </p>
 
         {error && (
-          <div className="mt-6 bg-red-50 text-red-700 text-sm p-3 rounded-xl border border-red-100">
-            {error}
+          <div className="mt-6 flex items-center justify-between bg-red-50 text-red-700 text-sm p-3 rounded-xl border border-red-100">
+            <span className="flex items-center gap-2">
+              <XCircle size={18} />
+              {error}
+            </span>
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="text-red-700 hover:text-red-900"
+            >
+              ✖
+            </button>
           </div>
         )}
+
         {msg && (
           <div className="mt-6 bg-green-50 text-green-700 text-sm p-3 rounded-xl border border-green-100">
             {msg}

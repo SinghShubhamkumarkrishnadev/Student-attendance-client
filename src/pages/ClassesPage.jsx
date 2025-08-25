@@ -1,3 +1,4 @@
+// src/pages/ClassesPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import {
   createClass,
@@ -14,7 +15,10 @@ import {
   RefreshCw,
   SortAsc,
   SortDesc,
+  Loader2,
 } from "lucide-react";
+import { toast } from "react-toastify";
+import { useConfirm } from "../components/ConfirmProvider";
 
 export default function ClassesPage() {
   const [classes, setClasses] = useState([]);
@@ -33,6 +37,13 @@ export default function ClassesPage() {
   const [sortBy, setSortBy] = useState("classId");
   const [sortDir, setSortDir] = useState("asc");
 
+  // button-loading states (added)
+  const [adding, setAdding] = useState(false);
+  const [editLoadingId, setEditLoadingId] = useState(null); // micro spinner when entering edit mode
+  const [savingId, setSavingId] = useState(null); // id being saved
+
+  const confirm = useConfirm();
+
   useEffect(() => {
     fetchClasses();
   }, []);
@@ -46,6 +57,7 @@ export default function ClassesPage() {
     } catch (err) {
       console.error("Error fetching classes", err);
       setError("⚠️ Failed to load classes");
+      toast.error("⚠️ Failed to load classes");
       setClasses([]);
     } finally {
       setLoading(false);
@@ -55,42 +67,76 @@ export default function ClassesPage() {
   const handleAddClass = async (e) => {
     e.preventDefault();
     try {
+      setAdding(true);
       await createClass({
         className: classForm.className,
         division: classForm.division,
       });
+      toast.success("✅ Class added");
       setClassForm({ className: "", division: "" });
-      fetchClasses();
+      await fetchClasses();
     } catch (err) {
       console.error("Error adding class", err);
-      setError("❌ Failed to add class");
+      const backendMsg = err.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `Failed to add class: ${backendMsg}`
+        : "Failed to add class";
+      setError(finalMsg);
+      toast.error(finalMsg);
+    } finally {
+      setAdding(false);
     }
   };
 
   const handleUpdateClass = async (id) => {
     try {
+      setSavingId(id);
       const cls = classes.find((c) => c._id === id);
       if (!cls) return;
       await updateClass(id, {
         className: cls.className,
         division: cls.division,
       });
+      toast.success("✅ Class updated");
       setEditClassId(null);
-      fetchClasses();
+      await fetchClasses();
     } catch (err) {
       console.error("Error updating class", err);
-      setError("❌ Failed to update class");
+      const backendMsg = err.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `Failed to update class: ${backendMsg}`
+        : "Failed to update class";
+      setError(finalMsg);
+      toast.error(finalMsg);
+    } finally {
+      setSavingId(null);
     }
   };
 
   const handleDeleteClass = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this class?")) return;
+    const cls = classes.find((c) => c._id === id);
+    const ok = await confirm({
+      title: "Delete Class",
+      message: `Are you sure you want to delete "${cls?.className || "this class"}"? This action cannot be undone.`,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      tone: "danger",
+    });
+    if (!ok) return;
+
     try {
       await deleteClass(id);
-      fetchClasses();
+      toast.success("🗑️ Class deleted");
+      await fetchClasses();
     } catch (err) {
       console.error("Error deleting class", err);
-      setError("❌ Failed to delete class");
+      const backendMsg = err.response?.data?.error;
+      const finalMsg = backendMsg
+        ? `Failed to delete class: ${backendMsg}`
+        : "Failed to delete class";
+      setError(finalMsg);
+      toast.error(finalMsg);
+
     }
   };
 
@@ -149,7 +195,15 @@ export default function ClassesPage() {
       <h1 className="text-2xl font-bold text-purple-700 mb-6">🏫 Manage Classes</h1>
 
       {error && (
-        <div className="mb-4 bg-red-100 text-red-700 p-2 rounded">{error}</div>
+        <div className="mb-4 flex items-center justify-between bg-red-100 text-red-700 p-3 rounded-lg">
+          <span className="flex items-center gap-2">
+            <XCircle size={18} />
+            {error}
+          </span>
+          <button onClick={() => setError("")} className="text-red-700 hover:text-red-900">
+            ✖
+          </button>
+        </div>
       )}
 
       {/* Controls: Search + Filters + Sort */}
@@ -241,6 +295,7 @@ export default function ClassesPage() {
           onChange={(e) => setClassForm({ ...classForm, className: e.target.value })}
           className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
           required
+          disabled={adding}
         />
         <input
           type="text"
@@ -249,12 +304,22 @@ export default function ClassesPage() {
           onChange={(e) => setClassForm({ ...classForm, division: e.target.value })}
           className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
           required
+          disabled={adding}
         />
         <button
           type="submit"
-          className="md:col-span-3 flex items-center justify-center gap-2 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition"
+          className="md:col-span-3 flex items-center justify-center gap-2 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition disabled:opacity-60"
+          disabled={adding}
         >
-          <PlusCircle size={18} /> Add Class
+          {adding ? (
+            <>
+              <Loader2 className="animate-spin" size={16} /> Adding...
+            </>
+          ) : (
+            <>
+              <PlusCircle size={18} /> Add Class
+            </>
+          )}
         </button>
       </form>
 
@@ -292,6 +357,7 @@ export default function ClassesPage() {
                           )
                         }
                         className="px-2 py-1 border rounded-lg"
+                        disabled={savingId === cls._id}
                       />
                     ) : (
                       cls.className
@@ -310,6 +376,7 @@ export default function ClassesPage() {
                           )
                         }
                         className="px-2 py-1 border rounded-lg"
+                        disabled={savingId === cls._id}
                       />
                     ) : (
                       cls.division
@@ -321,13 +388,21 @@ export default function ClassesPage() {
                       <>
                         <button
                           onClick={() => handleUpdateClass(cls._id)}
-                          className="px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-1"
+                          className="px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-1 disabled:opacity-60"
+                          disabled={savingId === cls._id}
                         >
-                          ✅ Save
+                          {savingId === cls._id ? (
+                            <>
+                              <Loader2 className="animate-spin" size={14} /> Saving...
+                            </>
+                          ) : (
+                            "✅ Save"
+                          )}
                         </button>
                         <button
                           onClick={() => setEditClassId(null)}
                           className="px-3 py-1 bg-gray-400 text-white rounded-lg hover:bg-gray-500 flex items-center gap-1"
+                          disabled={savingId === cls._id}
                         >
                           <XCircle size={16} /> Cancel
                         </button>
@@ -335,14 +410,28 @@ export default function ClassesPage() {
                     ) : (
                       <>
                         <button
-                          onClick={() => setEditClassId(cls._id)}
-                          className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                          onClick={() => {
+                            // micro loading indicator when entering edit mode
+                            setEditLoadingId(cls._id);
+                            setTimeout(() => {
+                              setEditClassId(cls._id);
+                              setEditLoadingId(null);
+                            }, 120);
+                          }}
+                          className="flex items-center gap-1 px-3 py-1 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-60"
+                          disabled={savingId !== null}
                         >
-                          <Edit size={16} /> Edit
+                          {editLoadingId === cls._id ? (
+                            <Loader2 className="animate-spin" size={14} />
+                          ) : (
+                            <Edit size={16} />
+                          )}
+                          Edit
                         </button>
                         <button
                           onClick={() => handleDeleteClass(cls._id)}
                           className="flex items-center gap-1 px-3 py-1 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                          disabled={savingId !== null}
                         >
                           <XCircle size={16} /> Delete
                         </button>
