@@ -20,6 +20,7 @@ export default function AssignProfessorsPage() {
   const [searchAvailable, setSearchAvailable] = useState("");
   const [searchAssigned, setSearchAssigned] = useState("");
   const [startsWith, setStartsWith] = useState("");
+  const [visibleCount, setVisibleCount] = useState(5);
 
   // UX loading states
   const [assigning, setAssigning] = useState(false);
@@ -39,11 +40,11 @@ export default function AssignProfessorsPage() {
   }));
 
 
-   // react-select expects selected value object
+  // react-select expects selected value object
   const selectedOption = selectedClass
     ? classOptions.find((opt) => opt.value === selectedClass)
     : null;
-  
+
 
   // Accept either an array or axios-like response
   const normalizeClassesResp = (res) => {
@@ -101,7 +102,7 @@ export default function AssignProfessorsPage() {
       setError(finalMsg);
       toast.error(finalMsg);
       setAssigning(false);
-    }finally {
+    } finally {
       setAssigning(false);
     }
   };
@@ -212,25 +213,36 @@ export default function AssignProfessorsPage() {
         />
       </div>
 
-      {/* Summary / counts */}
-      <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
-        <div className="flex gap-4 items-center">
-          <div className="bg-white p-3 rounded-lg shadow text-sm border">
+      {/* Summary box (white) containing professor counts */}
+      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md border">
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <div>
+            <div className="text-sm text-gray-600">Overview</div>
+            <div className="text-xs text-gray-500">Professor counts</div>
+          </div>
+        </div>
+
+        {/* Responsive Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="bg-white p-3 rounded-lg shadow text-sm border flex flex-col">
             <div className="text-xs text-gray-500">Total Professors</div>
             <div className="font-semibold text-gray-800">{totalCount}</div>
           </div>
-          <div className="bg-white p-3 rounded-lg shadow text-sm border">
+
+          <div className="bg-white p-3 rounded-lg shadow text-sm border flex flex-col">
             <div className="text-xs text-gray-500">Selected</div>
             <div className="font-semibold text-gray-800">{selectedCount}</div>
           </div>
+
           {selectedClass && (
-            <div className="bg-white p-3 rounded-lg shadow text-sm border">
+            <div className="bg-white p-3 rounded-lg shadow text-sm border flex flex-col">
               <div className="text-xs text-gray-500">Assigned to selected class</div>
               <div className="font-semibold text-gray-800">{assignedCount}</div>
             </div>
           )}
         </div>
       </div>
+
 
       {/* Professors Selection */}
       {selectedClass && (
@@ -256,7 +268,7 @@ export default function AssignProfessorsPage() {
             {filteredAvailable.length === 0 ? (
               <p className="text-gray-500">🚫 No professors match the filters.</p>
             ) : (
-              filteredAvailable.map((prof) => {
+              filteredAvailable.slice(0, visibleCount).map((prof) => {
                 const profIdStr = String(prof._id);
                 const checked = selectedProfs.includes(profIdStr);
                 return (
@@ -270,7 +282,9 @@ export default function AssignProfessorsPage() {
                       checked={checked}
                       onChange={() =>
                         setSelectedProfs((prev) =>
-                          prev.includes(profIdStr) ? prev.filter((id) => id !== profIdStr) : [...prev, profIdStr]
+                          prev.includes(profIdStr)
+                            ? prev.filter((id) => id !== profIdStr)
+                            : [...prev, profIdStr]
                         )
                       }
                       disabled={assigning || removingId !== null}
@@ -282,6 +296,30 @@ export default function AssignProfessorsPage() {
               })
             )}
           </div>
+
+          {/* Show More / Show Less button */}
+          {filteredAvailable.length > visibleCount && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={() => setVisibleCount((prev) => prev + 5)}
+                className="text-purple-600 font-medium hover:underline"
+              >
+                Show More
+              </button>
+            </div>
+          )}
+
+          {visibleCount > 5 && visibleCount >= filteredAvailable.length && (
+            <div className="flex justify-center mt-2">
+              <button
+                onClick={() => setVisibleCount(5)}
+                className="text-purple-600 font-medium hover:underline"
+              >
+                Show Less
+              </button>
+            </div>
+          )}
+
 
           <button
             onClick={handleAssign}

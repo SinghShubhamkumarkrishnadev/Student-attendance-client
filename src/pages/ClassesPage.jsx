@@ -350,17 +350,22 @@ export default function ClassesPage() {
       {/* Bulk Upload Classes */}
       <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
         <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Classes</h2>
-        <div className="flex flex-col md:flex-row gap-3 items-center">
+
+        {/* Responsive Row */}
+        <div className="flex flex-col md:flex-row gap-3 md:items-center">
+          {/* File Input */}
           <input
             type="file"
             accept=".xlsx, .xls"
             onChange={(e) => setBulkFile(e.target.files[0])}
-            className="border rounded-lg px-3 py-2"
+            className="border rounded-lg px-3 py-2 w-full md:w-auto"
             disabled={bulkUploading}
           />
+
+          {/* Upload Button */}
           <button
             onClick={handleBulkUpload}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 disabled:opacity-60"
+            className="w-full md:w-auto px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2 disabled:opacity-60"
             disabled={bulkUploading}
           >
             {bulkUploading ? (
@@ -372,10 +377,13 @@ export default function ClassesPage() {
             )}
           </button>
         </div>
+
+        {/* Helper Text */}
         <p className="text-sm text-gray-500 mt-1">
           Only Excel files (.xlsx, .xls) with <strong>className</strong> and <strong>division</strong> columns are supported.
         </p>
       </div>
+
 
       {/* Add Class Form */}
       <form
@@ -418,27 +426,28 @@ export default function ClassesPage() {
       </form>
 
       {/* Controls: Search + Filters + Sort */}
-      <div className="bg-white border rounded-2xl shadow-sm p-4 mb-6">
+      <div className="bg-white border rounded-2xl shadow-sm p-4 mb-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          {/* 🔍 Search */}
-          <div className="flex-1 relative">
+          {/* 🔍 Search Box */}
+          <div className="flex-1 relative w-full md:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by Class ID or Class Name..."
+              placeholder="🔍 Search by Class ID or Class Name..."
               className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
             />
           </div>
 
-          {/* 🛠 Filters + Sort */}
-          <div className="flex flex-wrap gap-2 md:flex-nowrap md:items-center">
-            <div className="flex items-center gap-2">
+          {/* 🛠 Filters + Sort Controls */}
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full md:w-auto">
+            {/* Division Filter */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <Filter size={18} className="text-purple-600" />
               <select
                 value={divisionFilter}
                 onChange={(e) => setDivisionFilter(e.target.value)}
-                className="border rounded-lg px-3 py-2 text-sm"
+                className="border rounded-lg px-3 py-2 w-full sm:w-auto"
                 title="Filter by division"
               >
                 {divisionOptions.map((d, i) => (
@@ -449,10 +458,11 @@ export default function ClassesPage() {
               </select>
             </div>
 
+            {/* Starts With Filter */}
             <select
               value={startsWith}
               onChange={(e) => setStartsWith(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm"
+              className="border rounded-lg px-3 py-2 w-full sm:w-auto"
               title="Filter by first letter/number"
             >
               {letters.map((l, i) => (
@@ -462,29 +472,32 @@ export default function ClassesPage() {
               ))}
             </select>
 
+            {/* Sort Field */}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm"
-              title="Sort by"
+              className="border rounded-lg px-3 py-2 w-full sm:w-auto"
+              title="Sort field"
             >
               <option value="classId">Sort by Class ID</option>
               <option value="className">Sort by Class Name</option>
               <option value="division">Sort by Division</option>
             </select>
 
+            {/* Sort Direction */}
             <button
               onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm"
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 w-full sm:w-auto"
               title="Toggle sort direction"
             >
               {sortDir === "asc" ? <SortAsc size={16} /> : <SortDesc size={16} />}
               {sortDir.toUpperCase()}
             </button>
 
+            {/* Reset */}
             <button
               onClick={resetControls}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm"
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2 w-full sm:w-auto"
               title="Reset"
             >
               <RefreshCw size={16} /> Reset
@@ -492,19 +505,19 @@ export default function ClassesPage() {
           </div>
         </div>
 
-        {/* 📊 Info */}
-        <div className="mt-2 text-sm text-gray-600">
+        {/* 📊 Showing Count */}
+        <div className="mt-3 text-sm text-gray-600">
           Showing <span className="font-semibold">{filtered.length}</span> of{" "}
           <span className="font-semibold">{Array.isArray(classes) ? classes.length : 0}</span> classes
         </div>
 
-        {/* ✅ Bulk selection toolbar */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        {/* ✅ Bulk Toolbar */}
+        <div className="mt-3 flex flex-col sm:flex-row flex-wrap items-center gap-2">
           <button
             onClick={toggleSelectAllOnPage}
-            className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm"
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 w-full sm:w-auto"
             disabled={!filtered.length}
-            title={allOnPageSelected ? "Unselect all on page" : "Select all on page"}
+            title={allOnPageSelected ? "Unselect all visible" : "Select all visible"}
           >
             {allOnPageSelected ? <CheckSquare size={16} /> : <Square size={16} />}
             {allOnPageSelected ? "Unselect All (visible)" : "Select All (visible)"}
@@ -512,7 +525,7 @@ export default function ClassesPage() {
 
           <button
             onClick={clearSelection}
-            className="px-3 py-2 border rounded-lg hover:bg-gray-50 text-sm"
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50 w-full sm:w-auto"
             disabled={!selectedIds.size}
             title="Clear selection"
           >
@@ -521,7 +534,7 @@ export default function ClassesPage() {
 
           <button
             onClick={handleBulkDeleteSelected}
-            className="px-3 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 flex items-center gap-2 text-sm disabled:opacity-60"
+            className="px-3 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 flex items-center justify-center gap-2 disabled:opacity-60 w-full sm:w-auto"
             disabled={!selectedIds.size || bulkDeleting}
             title="Delete selected"
           >

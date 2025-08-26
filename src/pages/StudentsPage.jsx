@@ -399,17 +399,22 @@ export default function StudentPage() {
       {/* Bulk Upload Students */}
       <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
         <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Students</h2>
-        <div className="flex flex-col md:flex-row gap-3 items-center">
+
+        {/* Responsive Row */}
+        <div className="flex flex-col md:flex-row gap-3 md:items-center">
+          {/* File Input */}
           <input
             type="file"
             accept=".xlsx, .xls, .csv"
             onChange={(e) => setBulkFile(e.target.files[0])}
-            className="border rounded-lg px-3 py-2"
+            className="border rounded-lg px-3 py-2 w-full md:w-auto"
             disabled={uploading}
           />
+
+          {/* Upload Button */}
           <button
             onClick={handleBulkUpload}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 disabled:opacity-60"
+            className="w-full md:w-auto px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2 disabled:opacity-60"
             disabled={uploading}
           >
             {uploading ? (
@@ -421,10 +426,15 @@ export default function StudentPage() {
             )}
           </button>
         </div>
+
+        {/* Helper Text */}
         <p className="text-sm text-gray-500 mt-1">
-          Only Excel files (.xlsx, .xls) with <strong>Name, Enrollment Number, Semester,</strong> and <strong>Division</strong> (optional) columns are supported.
+          Only Excel files (.xlsx, .xls) with{" "}
+          <strong>Name, Enrollment Number, Semester,</strong> and{" "}
+          <strong>Division</strong> (optional) columns are supported.
         </p>
       </div>
+
 
       {/* Add Single Student */}
       <div className="mb-6 bg-white p-6 rounded-2xl shadow-md border">

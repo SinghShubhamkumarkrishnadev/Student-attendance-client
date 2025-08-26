@@ -354,17 +354,22 @@ export default function ProfessorsPage() {
       {/* Bulk Upload Professors */}
       <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
         <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Professors</h2>
-        <div className="flex flex-col md:flex-row gap-3 items-center">
+
+        {/* Responsive Row */}
+        <div className="flex flex-col md:flex-row gap-3 md:items-center">
+          {/* File Input */}
           <input
             type="file"
             accept=".xlsx, .xls, .csv"
             onChange={(e) => setBulkFile(e.target.files[0])}
-            className="border rounded-lg px-3 py-2"
+            className="border rounded-lg px-3 py-2 w-full md:w-auto"
             disabled={bulkUploading}
           />
+
+          {/* Upload Button */}
           <button
             onClick={handleBulkUpload}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center gap-2 disabled:opacity-60"
+            className="w-full md:w-auto px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2 disabled:opacity-60"
             disabled={bulkUploading}
           >
             {bulkUploading ? (
@@ -376,10 +381,13 @@ export default function ProfessorsPage() {
             )}
           </button>
         </div>
+
+        {/* Helper Text */}
         <p className="text-sm text-gray-500 mt-1">
           Excel file (.xlsx, .xls or .csv). Required columns: <strong>name</strong>, <strong>username</strong>. Password optional.
         </p>
       </div>
+
 
       {/* Add Professor Form */}
       <div className="bg-white p-6 rounded-2xl shadow-md mb-8 border">

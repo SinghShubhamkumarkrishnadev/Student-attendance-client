@@ -489,25 +489,30 @@ export default function AssignStudentsPage() {
           </div>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <div className="bg-white p-3 rounded-lg shadow text-sm border flex-1">
+        {/* Responsive Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white p-3 rounded-lg shadow text-sm border flex flex-col">
             <div className="text-xs text-gray-500">Total Students</div>
             <div className="font-semibold text-gray-800">{totalCount}</div>
           </div>
-          <div className="bg-white p-3 rounded-lg shadow text-sm border flex-1">
+
+          <div className="bg-white p-3 rounded-lg shadow text-sm border flex flex-col">
             <div className="text-xs text-gray-500">Matching Filters</div>
             <div className="font-semibold text-gray-800">{availableCount}</div>
           </div>
-          <div className="bg-white p-3 rounded-lg shadow text-sm border flex-1">
+
+          <div className="bg-white p-3 rounded-lg shadow text-sm border flex flex-col">
             <div className="text-xs text-gray-500">Selected</div>
             <div className="font-semibold text-gray-800">{selectedCount}</div>
           </div>
-          <div className="bg-white p-3 rounded-lg shadow text-sm border flex-1">
+
+          <div className="bg-white p-3 rounded-lg shadow text-sm border flex flex-col">
             <div className="text-xs text-gray-500">Assigned to class</div>
             <div className="font-semibold text-gray-800">{assignedCount}</div>
           </div>
         </div>
       </div>
+
 
       {/* Selection Panel */}
       {selectedClass && (
