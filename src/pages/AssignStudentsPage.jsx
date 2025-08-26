@@ -450,7 +450,7 @@ export default function AssignStudentsPage() {
       )}
 
       {/* Select Class */}
-      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md">
+      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md border">
         <label className="font-medium text-gray-700 mb-2 block">📌 Select Class</label>
 
         <div className="flex items-center gap-3">
@@ -466,7 +466,7 @@ export default function AssignStudentsPage() {
             }}
             isClearable
             isDisabled={loadingClasses || loadingStudents || assigning || removingBulk || removingId !== null}
-            placeholder={loadingClasses ? "-- Loading classes... --" : "-- Select or Search a Class --"}
+            placeholder={loadingClasses ? "- Loading classes... -" : "- Select or Search a Class -"}
             classNamePrefix="react-select"
           />
 
@@ -481,7 +481,7 @@ export default function AssignStudentsPage() {
       </div>
 
       {/* Summary box (white) containing the four cards */}
-      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md">
+      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md border">
         <div className="flex items-start justify-between gap-4 mb-3">
           <div>
             <div className="text-sm text-gray-600">Overview</div>
@@ -511,13 +511,14 @@ export default function AssignStudentsPage() {
 
       {/* Selection Panel */}
       {selectedClass && (
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-md p-6 mb-6 border">
           <h2 className="font-semibold text-lg text-gray-800 mb-4">✅ Select Students</h2>
 
           {/* Filters (AVAILABLE) */}
-          <div className="flex flex-wrap items-center gap-3 mb-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:flex-wrap mb-4">
+            {/* Search */}
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input
                 type="text"
                 placeholder="Search students..."
@@ -528,10 +529,11 @@ export default function AssignStudentsPage() {
               />
             </div>
 
+            {/* Semester Filter */}
             <select
               value={semesterAvailable}
               onChange={(e) => setSemesterAvailable(e.target.value)}
-              className="border px-3 py-2 rounded-lg"
+              className="border px-3 py-2 rounded-lg flex-1 min-w-[150px]"
               disabled={loadingStudents || assigning || removingBulk || removingId !== null}
             >
               {semesterOptions.map((sem, i) => (
@@ -541,10 +543,11 @@ export default function AssignStudentsPage() {
               ))}
             </select>
 
+            {/* Division Filter */}
             <select
               value={divisionAvailable}
               onChange={(e) => setDivisionAvailable(e.target.value)}
-              className="border px-3 py-2 rounded-lg"
+              className="border px-3 py-2 rounded-lg flex-1 min-w-[150px]"
               disabled={loadingStudents || assigning || removingBulk || removingId !== null}
             >
               {divisionOptions.map((div) => (
@@ -554,6 +557,7 @@ export default function AssignStudentsPage() {
               ))}
             </select>
 
+            {/* Clear Filters */}
             <button
               onClick={() => {
                 setSearchAvailable("");
@@ -562,7 +566,7 @@ export default function AssignStudentsPage() {
                 setDivisionAvailable("");
                 setAvailableVisibleCount(PAGE_SIZE);
               }}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 text-sm"
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 text-sm flex-shrink-0"
               disabled={loadingStudents || assigning || removingBulk || removingId !== null}
             >
               Clear filters
@@ -570,7 +574,7 @@ export default function AssignStudentsPage() {
           </div>
 
           {/* Available batch-select controls */}
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4 mb-4">
             <label className="inline-flex items-center gap-2">
               <input
                 type="checkbox"
@@ -603,8 +607,7 @@ export default function AssignStudentsPage() {
             </div>
           </div>
 
-
-          {/* ASSIGN BUTTON placed immediately after filters */}
+          {/* Assign Button */}
           <div className="mb-4">
             <button
               onClick={handleAssign}
@@ -622,7 +625,7 @@ export default function AssignStudentsPage() {
             </button>
           </div>
 
-          {/* Student Grid (limited) */}
+          {/* Student Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {loadingStudents ? (
               <p className="text-gray-500">⏳ Loading students...</p>
@@ -662,7 +665,7 @@ export default function AssignStudentsPage() {
             )}
           </div>
 
-          {/* Show more / less for available (increments of 10) */}
+          {/* Show more / less */}
           {filteredAvailable.length > PAGE_SIZE && (
             <div className="mt-3 flex justify-center items-center gap-3">
               {availableVisibleCount < filteredAvailable.length ? (
@@ -689,11 +692,12 @@ export default function AssignStudentsPage() {
 
       {/* Already Assigned Students */}
       {selectedClass && (
-        <div className="bg-white rounded-2xl shadow-md p-6">
+        <div className="bg-white rounded-2xl shadow-md p-6 border">
           <h2 className="font-semibold text-lg text-gray-800 mb-4">🎓 Assigned Students</h2>
 
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <div className="relative flex-1 max-w-md">
+          {/* 🔍 Search + Filters */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap mb-4">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-3 text-gray-400" size={18} />
               <input
                 type="text"
@@ -708,7 +712,7 @@ export default function AssignStudentsPage() {
             <select
               value={semesterAssigned}
               onChange={(e) => setSemesterAssigned(e.target.value)}
-              className="border px-3 py-2 rounded-lg"
+              className="border px-3 py-2 rounded-lg min-w-[160px]"
               disabled={removingId !== null || assigning || removingBulk}
             >
               {semesterOptions.map((sem, i) => (
@@ -731,8 +735,8 @@ export default function AssignStudentsPage() {
             </button>
           </div>
 
-          {/* Assigned batch-select controls */}
-          <div className="flex items-center gap-3 mb-4">
+          {/* ✅ Batch Selection Toolbar */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap mb-4">
             <label className="inline-flex items-center gap-2">
               <input
                 type="checkbox"
@@ -760,13 +764,13 @@ export default function AssignStudentsPage() {
               Clear selection
             </button>
 
-            <div className="ml-auto text-sm text-gray-600">
+            <div className="sm:ml-auto text-sm text-gray-600">
               Selected: <span className="font-semibold">{selectedAssignedIds.length}</span>
             </div>
           </div>
 
-          {/* Batch remove button */}
-          <div className="mt-4 flex items-center gap-3">
+          {/* 🚫 Batch Remove Button */}
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-3">
             <button
               onClick={handleBatchRemove}
               className="bg-red-600 text-white px-4 py-2 rounded-xl shadow hover:bg-red-700 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -786,6 +790,7 @@ export default function AssignStudentsPage() {
 
           <br />
 
+          {/* 🧑‍🎓 Assigned Students List */}
           <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {assignedToShow.length === 0 ? (
               <p className="text-gray-500">🚫 No students assigned (or none match search/filters).</p>
@@ -819,7 +824,6 @@ export default function AssignStudentsPage() {
                           <span className="px-2 py-0.5 bg-purple-50 rounded">
                             {stu.semester ? `Sem: ${stu.semester}` : "Sem: -"}
                           </span>
-                          {/* division intentionally not shown */}
                         </div>
                       </div>
                     </div>
@@ -839,8 +843,7 @@ export default function AssignStudentsPage() {
                           "Remove"
                         )}
                       </button>
-
-                      <div className="text-xs text-gray-500"> {/* placeholder if want more actions */}</div>
+                      <div className="text-xs text-gray-500"></div>
                     </div>
                   </li>
                 );
@@ -848,7 +851,7 @@ export default function AssignStudentsPage() {
             )}
           </ul>
 
-          {/* Show more / less for assigned (increments of 10) */}
+          {/* 📌 Show more / less */}
           {assignedList.length > PAGE_SIZE && (
             <div className="mt-3 flex justify-center items-center gap-3">
               {assignedVisibleCount < assignedList.length ? (
@@ -871,11 +874,12 @@ export default function AssignStudentsPage() {
             </div>
           )}
 
-          {(!findClassById(selectedClass)?.students?.length) && (
+          {!findClassById(selectedClass)?.students?.length && (
             <p className="text-gray-500 text-center mt-4">🚫 No students assigned yet</p>
           )}
         </div>
       )}
+
       <BatchProgress
         open={showBatchProgress}
         done={removingProgress.done}

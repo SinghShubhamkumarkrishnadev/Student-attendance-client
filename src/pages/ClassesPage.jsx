@@ -101,7 +101,7 @@ export default function ClassesPage() {
     try {
       setBulkUploading(true);
 
-      const res = await bulkUploadClasses(bulkFile); 
+      const res = await bulkUploadClasses(bulkFile);
       const totalUploaded = res.totalUploaded || 0;
       const totalSkipped = res.totalSkipped || 0;
 
@@ -347,115 +347,6 @@ export default function ClassesPage() {
         </div>
       )}
 
-      {/* Controls: Search + Filters + Sort */}
-      <div className="bg-white border rounded-2xl shadow-sm p-4 mb-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by Class ID or Class Name..."
-              className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Filter size={18} className="text-purple-600" />
-            <select
-              value={divisionFilter}
-              onChange={(e) => setDivisionFilter(e.target.value)}
-              className="border rounded-lg px-3 py-2"
-              title="Filter by division"
-            >
-              {divisionOptions.map((d, i) => (
-                <option key={i} value={d}>
-                  {d === "" ? "All Divisions" : `Division ${d}`}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={startsWith}
-              onChange={(e) => setStartsWith(e.target.value)}
-              className="border rounded-lg px-3 py-2"
-              title="Filter by first letter/number"
-            >
-              {letters.map((l, i) => (
-                <option key={i} value={l}>
-                  {l === "" ? "Any Letter/Number" : l}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="border rounded-lg px-3 py-2"
-              title="Sort by"
-            >
-              <option value="classId">Sort by Class ID</option>
-              <option value="className">Sort by Class Name</option>
-              <option value="division">Sort by Division</option>
-            </select>
-
-            <button
-              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
-              title="Toggle sort direction"
-            >
-              {sortDir === "asc" ? <SortAsc size={16} /> : <SortDesc size={16} />}
-              {sortDir.toUpperCase()}
-            </button>
-
-            <button
-              onClick={resetControls}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
-              title="Reset"
-            >
-              <RefreshCw size={16} /> Reset
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-1 text-sm text-gray-600">
-          Showing <span className="font-semibold">{filtered.length}</span> of{" "}
-          <span className="font-semibold">{Array.isArray(classes) ? classes.length : 0}</span> classes
-        </div>
-
-        {/* ✅ Bulk selection toolbar */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            onClick={toggleSelectAllOnPage}
-            className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
-            disabled={!filtered.length}
-            title={allOnPageSelected ? "Unselect all on page" : "Select all on page"}
-          >
-            {allOnPageSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-            {allOnPageSelected ? "Unselect All (visible)" : "Select All (visible)"}
-          </button>
-
-          <button
-            onClick={clearSelection}
-            className="px-3 py-2 border rounded-lg hover:bg-gray-50"
-            disabled={!selectedIds.size}
-            title="Clear selection"
-          >
-            Clear Selection
-          </button>
-
-          <button
-            onClick={handleBulkDeleteSelected}
-            className="px-3 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 flex items-center gap-2 disabled:opacity-60"
-            disabled={!selectedIds.size || bulkDeleting}
-            title="Delete selected"
-          >
-            {bulkDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-            {bulkDeleting ? "Deleting..." : `Delete Selected (${selectedIds.size})`}
-          </button>
-        </div>
-      </div>
-
       {/* Bulk Upload Classes */}
       <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
         <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Classes</h2>
@@ -525,6 +416,121 @@ export default function ClassesPage() {
           )}
         </button>
       </form>
+
+      {/* Controls: Search + Filters + Sort */}
+      <div className="bg-white border rounded-2xl shadow-sm p-4 mb-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          {/* 🔍 Search */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by Class ID or Class Name..."
+              className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
+            />
+          </div>
+
+          {/* 🛠 Filters + Sort */}
+          <div className="flex flex-wrap gap-2 md:flex-nowrap md:items-center">
+            <div className="flex items-center gap-2">
+              <Filter size={18} className="text-purple-600" />
+              <select
+                value={divisionFilter}
+                onChange={(e) => setDivisionFilter(e.target.value)}
+                className="border rounded-lg px-3 py-2 text-sm"
+                title="Filter by division"
+              >
+                {divisionOptions.map((d, i) => (
+                  <option key={i} value={d}>
+                    {d === "" ? "All Divisions" : `Division ${d}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <select
+              value={startsWith}
+              onChange={(e) => setStartsWith(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm"
+              title="Filter by first letter/number"
+            >
+              {letters.map((l, i) => (
+                <option key={i} value={l}>
+                  {l === "" ? "Any Letter/Number" : l}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm"
+              title="Sort by"
+            >
+              <option value="classId">Sort by Class ID</option>
+              <option value="className">Sort by Class Name</option>
+              <option value="division">Sort by Division</option>
+            </select>
+
+            <button
+              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm"
+              title="Toggle sort direction"
+            >
+              {sortDir === "asc" ? <SortAsc size={16} /> : <SortDesc size={16} />}
+              {sortDir.toUpperCase()}
+            </button>
+
+            <button
+              onClick={resetControls}
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm"
+              title="Reset"
+            >
+              <RefreshCw size={16} /> Reset
+            </button>
+          </div>
+        </div>
+
+        {/* 📊 Info */}
+        <div className="mt-2 text-sm text-gray-600">
+          Showing <span className="font-semibold">{filtered.length}</span> of{" "}
+          <span className="font-semibold">{Array.isArray(classes) ? classes.length : 0}</span> classes
+        </div>
+
+        {/* ✅ Bulk selection toolbar */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={toggleSelectAllOnPage}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm"
+            disabled={!filtered.length}
+            title={allOnPageSelected ? "Unselect all on page" : "Select all on page"}
+          >
+            {allOnPageSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+            {allOnPageSelected ? "Unselect All (visible)" : "Select All (visible)"}
+          </button>
+
+          <button
+            onClick={clearSelection}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50 text-sm"
+            disabled={!selectedIds.size}
+            title="Clear selection"
+          >
+            Clear Selection
+          </button>
+
+          <button
+            onClick={handleBulkDeleteSelected}
+            className="px-3 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 flex items-center gap-2 text-sm disabled:opacity-60"
+            disabled={!selectedIds.size || bulkDeleting}
+            title="Delete selected"
+          >
+            {bulkDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+            {bulkDeleting ? "Deleting..." : `Delete Selected (${selectedIds.size})`}
+          </button>
+        </div>
+      </div>
+
 
       {/* Classes List */}
       {loading ? (

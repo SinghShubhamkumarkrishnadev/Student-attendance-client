@@ -101,6 +101,8 @@ export default function AssignProfessorsPage() {
       setError(finalMsg);
       toast.error(finalMsg);
       setAssigning(false);
+    }finally {
+      setAssigning(false);
     }
   };
 
@@ -197,7 +199,7 @@ export default function AssignProfessorsPage() {
       )}
 
       {/* Select Class */}
-      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md">
+      <div className="mb-6 bg-white p-4 rounded-2xl shadow-md border">
         <label className="font-medium text-gray-700 mb-2 block">📌 Select Class</label>
         <Select
           options={classOptions}
@@ -213,16 +215,16 @@ export default function AssignProfessorsPage() {
       {/* Summary / counts */}
       <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
         <div className="flex gap-4 items-center">
-          <div className="bg-white p-3 rounded-lg shadow text-sm">
+          <div className="bg-white p-3 rounded-lg shadow text-sm border">
             <div className="text-xs text-gray-500">Total Professors</div>
             <div className="font-semibold text-gray-800">{totalCount}</div>
           </div>
-          <div className="bg-white p-3 rounded-lg shadow text-sm">
+          <div className="bg-white p-3 rounded-lg shadow text-sm border">
             <div className="text-xs text-gray-500">Selected</div>
             <div className="font-semibold text-gray-800">{selectedCount}</div>
           </div>
           {selectedClass && (
-            <div className="bg-white p-3 rounded-lg shadow text-sm">
+            <div className="bg-white p-3 rounded-lg shadow text-sm border">
               <div className="text-xs text-gray-500">Assigned to selected class</div>
               <div className="font-semibold text-gray-800">{assignedCount}</div>
             </div>
@@ -232,7 +234,7 @@ export default function AssignProfessorsPage() {
 
       {/* Professors Selection */}
       {selectedClass && (
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-md p-6 mb-6 border">
           <h2 className="font-semibold text-lg text-gray-800 mb-4">✅ Select Professors</h2>
 
           {/* Filters row */}
@@ -301,7 +303,7 @@ export default function AssignProfessorsPage() {
 
       {/* Already Assigned Professors */}
       {selectedClass && (
-        <div className="bg-white rounded-2xl shadow-md p-6">
+        <div className="bg-white rounded-2xl shadow-md p-6 border">
           <h2 className="font-semibold text-lg text-gray-800 mb-4">🎓 Assigned Professors</h2>
 
           <div className="relative mb-4">

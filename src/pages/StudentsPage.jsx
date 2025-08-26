@@ -63,7 +63,7 @@ export default function StudentPage() {
   const [uploading, setUploading] = useState(false);
   const [batchUpdating, setBatchUpdating] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
-
+  const [sortOrder, setSortOrder] = useState("asc"); // asc | desc
   const [error, setError] = useState("");
 
   const confirm = useConfirm();
@@ -310,25 +310,29 @@ export default function StudentPage() {
 
   // Combined filtering + sorting
   const filteredStudents = useMemo(() => {
-    return students
-      .filter((s) => {
-        if (searchName && !(s.name || "").toLowerCase().includes(searchName.toLowerCase())) return false;
-        if (searchEnrollment && !((s.enrollmentNumber || "").toLowerCase().includes(searchEnrollment.toLowerCase()))) return false;
-        if (filterSemester && Number(s.semester) !== Number(filterSemester)) return false;
-        if (filterDivision && (s.division || "") !== filterDivision) return false;
-        return true;
-      })
-      .sort((a, b) => {
-        if (sortBy === "name") {
-          return (a.name || "").localeCompare(b.name || "");
-        } else if (sortBy === "enrollment") {
-          return (a.enrollmentNumber || "").localeCompare(b.enrollmentNumber || "");
-        } else if (sortBy === "semester") {
-          return Number(a.semester || 0) - Number(b.semester || 0);
-        }
-        return 0;
-      });
-  }, [students, searchName, searchEnrollment, filterSemester, filterDivision, sortBy]);
+    let arr = students.filter((s) => {
+      if (searchName && !(s.name || "").toLowerCase().includes(searchName.toLowerCase())) return false;
+      if (searchEnrollment && !((s.enrollmentNumber || "").toLowerCase().includes(searchEnrollment.toLowerCase())))
+        return false;
+      if (filterSemester && Number(s.semester) !== Number(filterSemester)) return false;
+      if (filterDivision && (s.division || "") !== filterDivision) return false;
+      return true;
+    });
+
+    arr.sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === "name") {
+        cmp = (a.name || "").localeCompare(b.name || "");
+      } else if (sortBy === "enrollment") {
+        cmp = (a.enrollmentNumber || "").localeCompare(b.enrollmentNumber || "");
+      } else if (sortBy === "semester") {
+        cmp = Number(a.semester || 0) - Number(b.semester || 0);
+      }
+      return sortOrder === "asc" ? cmp : -cmp;
+    });
+
+    return arr;
+  }, [students, searchName, searchEnrollment, filterSemester, filterDivision, sortBy, sortOrder]);
 
   const visibleStudents = useMemo(() => filteredStudents.slice(0, visibleCount), [filteredStudents, visibleCount]);
 
@@ -392,122 +396,6 @@ export default function StudentPage() {
         </div>
       )}
 
-      {/* Controls: Search + Filters + Sort */}
-      <div className="bg-white border rounded-2xl shadow-sm p-4 mb-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2" size={18} />
-            <input
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              placeholder="Search by name..."
-              className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Filter size={18} className="text-purple-600" />
-            <input
-              type="text"
-              placeholder="Search by enrollment..."
-              value={searchEnrollment}
-              onChange={(e) => setSearchEnrollment(e.target.value)}
-              className="border rounded-lg px-3 py-2"
-            />
-
-            <select
-              value={filterDivision}
-              onChange={(e) => setFilterDivision(e.target.value)}
-              className="border rounded-lg px-3 py-2"
-              title="Filter by division"
-            >
-              {divisionOptions.map((d, i) => (
-                <option key={i} value={d}>
-                  {d === "" ? "All Divisions" : `Division ${d}`}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="border rounded-lg px-3 py-2"
-              title="Sort by"
-            >
-              <option value="name">Sort by Name</option>
-              <option value="enrollment">Sort by Enrollment</option>
-              <option value="semester">Sort by Semester</option>
-            </select>
-
-            <button
-              onClick={() => setSortBy((s) => s === "name" ? "enrollment" : "name")}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
-              title="Toggle sort field"
-            >
-              <SortAsc size={16} /> {sortBy}
-            </button>
-
-            <button
-              onClick={() => {
-                setSearchName("");
-                setSearchEnrollment("");
-                setFilterSemester("");
-                setFilterDivision("");
-                setSortBy("name");
-              }}
-              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
-              title="Reset"
-            >
-              <RefreshCw size={16} /> Reset
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-1 text-sm text-gray-600">
-          Showing <span className="font-semibold">{filteredStudents.length}</span> of{" "}
-          <span className="font-semibold">{Array.isArray(students) ? students.length : 0}</span> students
-        </div>
-
-        {/* Bulk toolbar */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            onClick={toggleSelectAllOnPage}
-            className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2"
-            disabled={!filteredStudents.length}
-            title={allOnPageSelected ? "Unselect all visible" : "Select all visible"}
-          >
-            {allOnPageSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-            {allOnPageSelected ? "Unselect All (visible)" : "Select All (visible)"}
-          </button>
-
-          <button
-            onClick={clearSelection}
-            className="px-3 py-2 border rounded-lg hover:bg-gray-50"
-            disabled={selectedIds.size === 0}
-          >
-            Clear Selection
-          </button>
-
-          <button
-            onClick={() => setBatchModalOpen(true)}
-            disabled={selectedIds.size === 0 || batchUpdating}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-60"
-          >
-            {batchUpdating ? <Loader2 className="animate-spin" size={16} /> : "🛠️ Batch Update"}
-            <span className="ml-1">({selectedIds.size})</span>
-          </button>
-
-          <button
-            onClick={handleBatchDelete}
-            disabled={selectedIds.size === 0 || bulkDeleting}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 disabled:opacity-60"
-          >
-            {bulkDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-            <span className="ml-1">Delete Selected ({selectedIds.size})</span>
-          </button>
-        </div>
-      </div>
-
       {/* Bulk Upload Students */}
       <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
         <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Students</h2>
@@ -539,56 +427,186 @@ export default function StudentPage() {
       </div>
 
       {/* Add Single Student */}
-      <div className="mb-6 bg-white p-6 rounded-2xl shadow-md">
+      <div className="mb-6 bg-white p-6 rounded-2xl shadow-md border">
         <h2 className="text-lg font-semibold text-purple-700 mb-4 flex items-center gap-2">
           <PlusCircle /> Add Single Student
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <input
             type="text"
-            placeholder="Name"
+            placeholder="👤 Name"
             value={newStudent.name}
             onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-            className="px-4 py-2 border rounded-lg"
+            className="px-3 py-2 border rounded-lg"
           />
           <input
             type="text"
-            placeholder="Enrollment Number"
+            placeholder="🆔 Roll Number"
             value={newStudent.enrollmentNumber}
             onChange={(e) => setNewStudent({ ...newStudent, enrollmentNumber: e.target.value })}
-            className="px-4 py-2 border rounded-lg"
+            className="px-3 py-2 border rounded-lg"
           />
           <input
             type="number"
-            placeholder="Semester"
+            placeholder="🎓 Semester"
             value={newStudent.semester}
             onChange={(e) => setNewStudent({ ...newStudent, semester: e.target.value })}
-            className="px-4 py-2 border rounded-lg"
+            className="px-3 py-2 border rounded-lg"
           />
           <input
             type="text"
-            placeholder="Division (optional)"
+            placeholder="🏷️Division (optional)"
             value={newStudent.division}
             onChange={(e) => setNewStudent({ ...newStudent, division: e.target.value })}
-            className="px-4 py-2 border rounded-lg"
+            className="px-3 py-2 border rounded-lg"
           />
         </div>
         <div className="mt-4">
           <button
             onClick={handleAddStudent}
             disabled={adding}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             {adding ? <><Loader2 className="animate-spin" size={14} /> Adding...</> : "➕ Add Student"}
           </button>
         </div>
       </div>
 
+      {/* Controls: Search + Filters + Sort */}
+      <div className="bg-white border rounded-2xl shadow-sm p-4 mb-6">
+        {/* Top Row: Search + Filters */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          {/* ✅ Search bar full width on mobile */}
+          <div className="flex-1 relative w-full md:max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            <input
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              placeholder="Search by name..."
+              className="w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-400"
+            />
+          </div>
+
+          {/* ✅ Filters stack on mobile, row on larger screens */}
+          <div className="flex flex-wrap gap-2 md:flex-nowrap">
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Filter size={18} className="text-purple-600 shrink-0" />
+              <select
+                value={filterDivision}
+                onChange={(e) => setFilterDivision(e.target.value)}
+                className="border rounded-lg px-3 py-2 w-full md:w-auto"
+                title="Filter by division"
+              >
+                {divisionOptions.map((d, i) => (
+                  <option key={i} value={d}>
+                    {d === "" ? "All Divisions" : `Division ${d}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="border rounded-lg px-3 py-2 w-full md:w-auto"
+              title="Sort by"
+            >
+              <option value="name">Sort by Name</option>
+              <option value="enrollment">Sort by Enrollment</option>
+              <option value="semester">Sort by Semester</option>
+            </select>
+
+            <button
+              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 w-full md:w-auto justify-center"
+              title={`Sort ${sortOrder === "asc" ? "Descending" : "Ascending"}`}
+            >
+              {sortOrder === "asc" ? (
+                <>
+                  <SortAsc size={16} />
+                  <span>Asc</span>
+                </>
+              ) : (
+                <>
+                  <SortDesc size={16} />
+                  <span>Desc</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setSearchName("");
+                setSearchEnrollment("");
+                setFilterSemester("");
+                setFilterDivision("");
+                setSortBy("name");
+                setSortOrder("asc");
+              }}
+              className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 w-full md:w-auto justify-center"
+              title="Reset"
+            >
+              <RefreshCw size={16} /> Reset
+            </button>
+          </div>
+        </div>
+
+        {/* ✅ Info text */}
+        <div className="mt-2 text-sm text-gray-600 text-center md:text-left">
+          Showing <span className="font-semibold">{filteredStudents.length}</span> of{" "}
+          <span className="font-semibold">{Array.isArray(students) ? students.length : 0}</span> students
+        </div>
+
+        {/* ✅ Bulk toolbar (responsive wrap) */}
+        <div className="mt-3 flex flex-wrap gap-2 justify-center md:justify-start">
+          <button
+            onClick={toggleSelectAllOnPage}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50 flex items-center gap-2 w-full sm:w-auto justify-center"
+            disabled={!filteredStudents.length}
+            title={allOnPageSelected ? "Unselect all visible" : "Select all visible"}
+          >
+            {allOnPageSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+            {allOnPageSelected ? "Unselect All (visible)" : "Select All (visible)"}
+          </button>
+
+          <button
+            onClick={clearSelection}
+            className="px-3 py-2 border rounded-lg hover:bg-gray-50 w-full sm:w-auto"
+            disabled={selectedIds.size === 0}
+          >
+            Clear Selection
+          </button>
+
+          <button
+            onClick={() => setBatchModalOpen(true)}
+            disabled={selectedIds.size === 0 || batchUpdating}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 disabled:opacity-60 w-full sm:w-auto justify-center"
+          >
+            {batchUpdating ? <Loader2 className="animate-spin" size={16} /> : "🛠️ Batch Update"}
+            <span className="ml-1">({selectedIds.size})</span>
+          </button>
+
+          <button
+            onClick={handleBatchDelete}
+            disabled={selectedIds.size === 0 || bulkDeleting}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 disabled:opacity-60 w-full sm:w-auto justify-center"
+          >
+            {bulkDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+            <span className="ml-1">Delete Selected ({selectedIds.size})</span>
+          </button>
+        </div>
+      </div>
+
+
       {/* Student grid */}
       {loading ? (
         <div className="flex items-center justify-center">
           <Loader2 className="animate-spin text-purple-600" size={32} />
           <span className="ml-2">Loading Students...</span>
+        </div>
+      ) : filteredStudents.length === 0 ? (
+        <div className="text-center text-gray-500 text-lg py-12">
+          🚫 No students found
         </div>
       ) : (
         <>
