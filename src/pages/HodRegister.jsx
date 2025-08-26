@@ -1,7 +1,8 @@
+// src/pages/HodRegister.jsx
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import api from "../services/api";
-import { Eye, EyeOff, Building2, XCircle } from "lucide-react"; // <-- icons
+import api, { resendOtp } from "../services/api";
+import { Eye, EyeOff, Building2, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function HodRegister() {
@@ -68,7 +69,6 @@ export default function HodRegister() {
       setMsg(message || "🎉 OTP Verified! You’re logged in.");
 
       setTimeout(() => navigate("/hod/dashboard"), 1200);
-
     } catch (err) {
       const backendMsg = err?.response?.data?.error;
       const finalMsg = backendMsg
@@ -79,6 +79,27 @@ export default function HodRegister() {
       setLoading(false);
     }
   };
+
+  // NEW: resend OTP handler for registration stage
+  const handleResendOtp = async () => {
+    if (!email) {
+      setError("Please provide your email in the form above to resend OTP.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setMsg("");
+    try {
+      await resendOtp({ email });
+      setMsg("✅ OTP resent to your email. Check spam/junk too.");
+    } catch (err) {
+      const backendMsg = err?.response?.data?.error || err?.response?.data?.message;
+      setError(backendMsg ? `Failed to resend OTP: ${backendMsg}` : "Failed to resend OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-tr from-indigo-50 via-purple-50 to-pink-50 p-6">
@@ -222,6 +243,15 @@ export default function HodRegister() {
               className="w-full py-3 rounded-xl font-semibold text-white bg-green-600 hover:bg-green-700 active:scale-[0.99] transition disabled:opacity-60"
             >
               {loading ? "⏳ Verifying..." : "✅ Verify OTP"}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={loading}
+              className="text-sm text-purple-600 font-semibold hover:underline"
+            >
+              Didn't receive? Resend OTP
             </button>
           </form>
         )}

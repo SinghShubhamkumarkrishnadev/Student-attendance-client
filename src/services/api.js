@@ -17,8 +17,23 @@ API.interceptors.request.use((config) => {
 // ====================== HOD APIs ======================
 export const registerHod = (data) => API.post("/hods/register", data);
 export const verifyOtp = (data) => API.post("/hods/verify-otp", data);
+export const resendOtp = (data) => API.post("/hods/resend-otp", data); // { email }
 export const loginHod = (data) => API.post("/hods/login", data);
 export const getHodProfile = () => API.get("/hods/profile");
+
+// Update HOD profile (triggers OTP if sensitive fields)
+export const updateHod = (data) => API.put("/hods/update", data);
+
+// Verify OTP for profile updates (email/password update)
+export const verifyUpdateOtp = (data) =>
+  API.post("/hods/verify-update-otp", data); // { otp }
+
+// Delete flow: request delete OTP
+export const sendDeleteOtp = () => API.post("/hods/delete-request");
+
+// Confirm deletion with OTP
+export const confirmDeleteHod = (data) =>
+  API.post("/hods/confirm-delete", data); // { otp }
 
 // ====================== PROFESSOR APIs ======================
 export const addProfessor = (profData) => API.post("/professors", profData);
@@ -29,7 +44,6 @@ export const updateProfessor = (id, profData) =>
   API.put(`/professors/${id}`, profData);
 
 // ====================== PROFESSOR BULK APIs ======================
-
 // Bulk upload professors via Excel
 export const bulkUploadProfessors = async (file) => {
   const formData = new FormData();
@@ -76,7 +90,6 @@ export const batchDeleteProfessorsClient = async (professorIds, { onProgress } =
 };
 
 // ====================== CLASS APIs ======================
-
 // Create new class
 export const createClass = (classData) => API.post("/classes", classData);
 
@@ -186,7 +199,6 @@ export const deleteStudent = async (id) => {
 };
 
 // ====================== CLASS → STUDENT ASSIGNMENT APIs ======================
-
 // Assign students to a class
 export const assignStudentsToClass = (classId, studentIds) =>
   API.post(`/classes/${classId}/students`, { studentIds });
@@ -199,9 +211,6 @@ export const removeStudentsFromClass = (classId, studentIds) =>
   });
 
 // ====================== CLIENT-SIDE BATCH UPDATER ======================
-// Uses the existing updateStudent endpoint for each id; concurrency-controlled.
-// onProgress is optional and called with { done, total }
-// IMPORTANT: For safety we only allow 'semester' and 'division' to be sent
 export const batchUpdateStudentsClient = async (
   studentIds,
   updates,
@@ -211,7 +220,6 @@ export const batchUpdateStudentsClient = async (
   const allowed = {};
   if (updates && typeof updates === "object") {
     if (updates.hasOwnProperty("semester")) {
-      // ensure we send a number if possible
       const s = updates.semester;
       allowed.semester =
         s === "" || s === null || typeof s === "undefined" ? undefined : Number(s);
@@ -292,8 +300,6 @@ export const deleteStudentsBulk = async (studentIds) => {
 };
 
 // ====================== CLIENT-SIDE BATCH REMOVER ======================
-// Calls backend once with all studentIds
-// onProgress is optional but now trivial (0 → 100%)
 export const batchRemoveStudentsFromClassClient = async (
   classId,
   studentIds,

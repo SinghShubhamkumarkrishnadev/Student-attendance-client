@@ -1,16 +1,8 @@
+// src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { loginHod, getHodProfile } from "../services/api";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
-/**
- * AuthContext
- * - Keeps token in localStorage and in state
- * - On load: if token exists, fetch HOD profile from backend
- * - Exposes login(credentials) which calls loginHod, stores token, fetches profile
- * - Exposes logout()
- * - Exposes loading while profile is being fetched
- */
 
 const AuthContext = createContext();
 
@@ -27,6 +19,7 @@ export function AuthProvider({ children }) {
       username: profile.username,
       collegeName: profile.collegeName,
       email: profile.email,
+      pendingUpdates: profile.pendingUpdates || undefined,
       ...profile,
     };
   };
@@ -42,7 +35,7 @@ export function AuthProvider({ children }) {
       setLoading(true);
       const res = await getHodProfile();
       const data = res?.data || {};
-      const profile = data.hod || data.data?.hod || data; // <-- fixed shape
+      const profile = data.hod || data.data?.hod || data; // normalize shapes
       setHod(normalizeProfile(profile));
     } catch (err) {
       toast.error("Session expired. Please log in again.");
@@ -62,6 +55,7 @@ export function AuthProvider({ children }) {
       fetchProfile();
     } else {
       localStorage.removeItem("hodToken");
+      setHod(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
@@ -94,7 +88,6 @@ export function AuthProvider({ children }) {
       } else {
         toast.error("Login failed: Unexpected error. Check console for details.");
       }
-
       throw err;
     }
   };
@@ -106,13 +99,11 @@ export function AuthProvider({ children }) {
     toast.info("Logged out successfully 👋");
   };
 
-  // new helper for flows like OTP verify
+  // helper to set auth after OTP verify flows
   const setAuth = (hodData, tokenFromServer) => {
     if (!tokenFromServer) return;
-
     setToken(tokenFromServer); // triggers fetchProfile via useEffect
     localStorage.setItem("hodToken", tokenFromServer);
-
     if (hodData) {
       setHod(normalizeProfile(hodData));
     }
@@ -120,7 +111,17 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ hod, token, login, logout, setAuth, loading }}>
+    <AuthContext.Provider
+      value={{
+        hod,
+        token,
+        login,
+        logout,
+        setAuth,
+        loading,
+        refreshProfile: fetchProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

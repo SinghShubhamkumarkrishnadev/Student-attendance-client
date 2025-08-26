@@ -9,7 +9,7 @@ import ClassesPage from "./pages/ClassesPage";
 import AssignProfessorsPage from "./pages/AssignProfessorsPage";
 import StudentsPage from "./pages/StudentsPage";
 import AssignStudentsPage from "./pages/AssignStudentsPage";
-
+import HodProfile from "./pages/HodProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ConfirmProvider } from "./components/ConfirmProvider"; // ⬅️ add this
 
@@ -66,6 +66,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <ClassesPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/hod/profile"
+            element={
+              <ProtectedRoute>
+                <HodProfile />
               </ProtectedRoute>
             }
           />

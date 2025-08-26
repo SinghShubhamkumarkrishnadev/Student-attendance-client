@@ -1,6 +1,6 @@
 // src/pages/HodDashboard.jsx
 import { useAuth } from "../context/AuthContext";
-import { LogOut, Building2 } from "lucide-react";
+import { LogOut, Building2, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getProfessors, getClasses, getStudents } from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -69,9 +69,20 @@ export default function HodDashboard() {
               <span className="font-medium text-gray-700 hidden md:inline">
                 👋 Welcome, {hod?.username || ""}
               </span>
+
+              {/* Profile Icon Button */}
+              <button
+                onClick={() => navigate("/hod/profile")}
+                className="p-2 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 hover:scale-110 transition-all shadow-md"
+                title="Profile"
+              >
+                <User size={30} />
+              </button>
+
+              {/* Logout Button */}
               <button
                 onClick={logout}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500 text-white font-medium hover:bg-red-600 transition"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 text-white font-medium hover:from-red-600 hover:to-pink-600 shadow-md hover:shadow-lg transition-all"
               >
                 <LogOut size={18} /> Logout
               </button>
