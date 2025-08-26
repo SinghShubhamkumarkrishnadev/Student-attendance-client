@@ -18,6 +18,8 @@ import {
   KeyRound,
   Trash2,
   ShieldCheck,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function HodProfile() {
@@ -37,11 +39,15 @@ export default function HodProfile() {
 
   // Loading & OTP
   const [updateLoading, setUpdateLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [sendDeleteLoading, setSendDeleteLoading] = useState(false);
+  const [confirmDeleteLoading, setConfirmDeleteLoading] = useState(false);
   const [otpMode, setOtpMode] = useState(false);
   const [otp, setOtp] = useState("");
   const [deleteOtp, setDeleteOtp] = useState("");
   const [pendingMessage, setPendingMessage] = useState("");
+
+  // Password visibility
+  const [showPassword, setShowPassword] = useState(false);
 
   // Initialize profile
   useEffect(() => {
@@ -80,7 +86,8 @@ export default function HodProfile() {
       if (editedProfile.collegeName !== profile.collegeName)
         direct.collegeName = editedProfile.collegeName;
 
-      if (editedProfile.email !== profile.email) sensitive.email = editedProfile.email;
+      if (editedProfile.email !== profile.email)
+        sensitive.email = editedProfile.email;
       if (editedProfile.password) sensitive.password = editedProfile.password;
 
       if (Object.keys(direct).length && Object.keys(sensitive).length) {
@@ -98,7 +105,9 @@ export default function HodProfile() {
         const res = await updateHod(sensitive);
         toast.success(res?.data?.message || "🔐 OTP sent. Please verify.");
         setOtpMode(true);
-        setPendingMessage(res?.data?.email ? `📩 OTP sent to ${res.data.email}` : "");
+        setPendingMessage(
+          res?.data?.email ? `📩 OTP sent to ${res.data.email}` : ""
+        );
         setIsEditingSensitive(false);
       } else {
         toast.info("ℹ️ No changes detected.");
@@ -128,7 +137,8 @@ export default function HodProfile() {
   };
 
   const handleResendUpdateOtp = async () => {
-    if (!hod?.pendingUpdates) return toast.info("ℹ️ No pending sensitive update.");
+    if (!hod?.pendingUpdates)
+      return toast.info("ℹ️ No pending sensitive update.");
     setUpdateLoading(true);
     try {
       await updateHod(hod.pendingUpdates);
@@ -141,20 +151,20 @@ export default function HodProfile() {
   };
 
   const handleSendDeleteOtp = async () => {
-    setDeleteLoading(true);
+    setSendDeleteLoading(true);
     try {
       await sendDeleteOtp();
       toast.success("📩 Delete OTP sent to your email.");
     } catch (err) {
       toast.error(err?.response?.data?.message || "❌ Failed to send delete OTP.");
     } finally {
-      setDeleteLoading(false);
+      setSendDeleteLoading(false);
     }
   };
 
   const handleConfirmDelete = async () => {
     if (!deleteOtp) return toast.error("Enter delete OTP.");
-    setDeleteLoading(true);
+    setConfirmDeleteLoading(true);
     try {
       await confirmDeleteHod({ otp: deleteOtp });
       toast.success("🗑️ Account deleted. Redirecting...");
@@ -163,7 +173,7 @@ export default function HodProfile() {
     } catch (err) {
       toast.error(err?.response?.data?.message || "❌ Failed to confirm delete.");
     } finally {
-      setDeleteLoading(false);
+      setConfirmDeleteLoading(false);
     }
   };
 
@@ -190,11 +200,16 @@ export default function HodProfile() {
                   type="text"
                   value={editedProfile.collegeName}
                   onChange={(e) =>
-                    setEditedProfile((prev) => ({ ...prev, collegeName: e.target.value }))
+                    setEditedProfile((prev) => ({
+                      ...prev,
+                      collegeName: e.target.value,
+                    }))
                   }
                   disabled={!isEditingDirect}
                   className={`mt-1 block w-full rounded-md border px-3 py-2 ${
-                    isEditingDirect ? "border-purple-400" : "border-gray-200 bg-gray-100"
+                    isEditingDirect
+                      ? "border-purple-400"
+                      : "border-gray-200 bg-gray-100"
                   }`}
                 />
               </div>
@@ -206,11 +221,16 @@ export default function HodProfile() {
                   type="text"
                   value={editedProfile.username}
                   onChange={(e) =>
-                    setEditedProfile((prev) => ({ ...prev, username: e.target.value }))
+                    setEditedProfile((prev) => ({
+                      ...prev,
+                      username: e.target.value,
+                    }))
                   }
                   disabled={!isEditingDirect}
                   className={`mt-1 block w-full rounded-md border px-3 py-2 ${
-                    isEditingDirect ? "border-purple-400" : "border-gray-200 bg-gray-100"
+                    isEditingDirect
+                      ? "border-purple-400"
+                      : "border-gray-200 bg-gray-100"
                   }`}
                 />
               </div>
@@ -223,7 +243,8 @@ export default function HodProfile() {
                       disabled={updateLoading}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg shadow hover:bg-purple-700 transition"
                     >
-                      <Save size={16} /> {updateLoading ? "⏳ Working..." : "Save"}
+                      <Save size={16} />{" "}
+                      {updateLoading ? "⏳ Working..." : "Save"}
                     </button>
                     <button
                       type="button"
@@ -263,11 +284,16 @@ export default function HodProfile() {
                   type="email"
                   value={editedProfile.email}
                   onChange={(e) =>
-                    setEditedProfile((prev) => ({ ...prev, email: e.target.value }))
+                    setEditedProfile((prev) => ({
+                      ...prev,
+                      email: e.target.value,
+                    }))
                   }
                   disabled={!isEditingSensitive}
                   className={`mt-1 block w-full rounded-md border px-3 py-2 ${
-                    isEditingSensitive ? "border-red-400" : "border-gray-200 bg-gray-100"
+                    isEditingSensitive
+                      ? "border-red-400"
+                      : "border-gray-200 bg-gray-100"
                   }`}
                 />
               </div>
@@ -275,18 +301,34 @@ export default function HodProfile() {
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mt-2">
                   <KeyRound size={16} /> Password
                 </label>
-                <input
-                  type="password"
-                  value={editedProfile.password}
-                  onChange={(e) =>
-                    setEditedProfile((prev) => ({ ...prev, password: e.target.value }))
-                  }
-                  disabled={!isEditingSensitive}
-                  placeholder="Enter new password"
-                  className={`mt-1 block w-full rounded-md border px-3 py-2 ${
-                    isEditingSensitive ? "border-red-400" : "border-gray-200 bg-gray-100"
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={editedProfile.password}
+                    onChange={(e) =>
+                      setEditedProfile((prev) => ({
+                        ...prev,
+                        password: e.target.value,
+                      }))
+                    }
+                    disabled={!isEditingSensitive}
+                    placeholder="Enter new password"
+                    className={`mt-1 block w-full rounded-md border px-3 py-2 ${
+                      isEditingSensitive
+                        ? "border-red-400"
+                        : "border-gray-200 bg-gray-100"
+                    }`}
+                  />
+                  {isEditingSensitive && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((p) => !p)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex gap-2 mt-4 flex-wrap">
@@ -297,7 +339,8 @@ export default function HodProfile() {
                       disabled={updateLoading}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg shadow hover:bg-red-700 transition"
                     >
-                      <Save size={16} /> {updateLoading ? "⏳ Working..." : "Save"}
+                      <Save size={16} />{" "}
+                      {updateLoading ? "⏳ Working..." : "Save"}
                     </button>
                     <button
                       type="button"
@@ -321,7 +364,7 @@ export default function HodProfile() {
             </div>
           </div>
 
-          {/* Resend OTP for pending sensitive updates */}
+          {/* Resend OTP */}
           {hod?.pendingUpdates && (
             <div className="mt-2">
               <button
@@ -340,7 +383,8 @@ export default function HodProfile() {
         {otpMode && (
           <div className="mt-6 p-4 border rounded-md bg-gray-50">
             <p className="text-sm text-gray-600 mb-2">
-              Enter OTP to complete update {pendingMessage && <span>- {pendingMessage}</span>}
+              Enter OTP to complete update{" "}
+              {pendingMessage && <span>- {pendingMessage}</span>}
             </p>
             <form onSubmit={handleVerifyUpdateOtp} className="flex gap-2">
               <input
@@ -366,15 +410,17 @@ export default function HodProfile() {
             <Trash2 size={18} /> Danger Zone
           </h3>
           <p className="text-sm text-gray-600 mt-2">
-            ⚠️ Delete your account and all related data. This action is irreversible.
+            ⚠️ Delete your account and all related data. This action is
+            irreversible.
           </p>
           <div className="mt-4 flex gap-2 flex-wrap items-center">
             <button
               onClick={handleSendDeleteOtp}
-              disabled={deleteLoading}
+              type="button"
+              disabled={sendDeleteLoading}
               className="px-4 py-2 bg-red-500 text-white rounded-lg shadow hover:bg-red-600 transition"
             >
-              {deleteLoading ? "⏳ Sending OTP..." : "📩 Send Delete OTP"}
+              {sendDeleteLoading ? "⏳ Sending OTP..." : "📩 Send Delete OTP"}
             </button>
             <input
               value={deleteOtp}
@@ -384,10 +430,11 @@ export default function HodProfile() {
             />
             <button
               onClick={handleConfirmDelete}
-              disabled={deleteLoading}
+              type="button"
+              disabled={confirmDeleteLoading}
               className="px-4 py-2 border rounded-lg text-red-600 hover:bg-red-50 transition"
             >
-              {deleteLoading ? "⏳ Deleting..." : "🗑️ Confirm Delete"}
+              {confirmDeleteLoading ? "⏳ Deleting..." : "🗑️ Confirm Delete"}
             </button>
           </div>
         </div>
