@@ -32,6 +32,8 @@ export default function HodProfile() {
     username: "",
     email: "",
     password: "",
+    altPassword: "",
+
   });
   const [editedProfile, setEditedProfile] = useState(profile);
   const [isEditingDirect, setIsEditingDirect] = useState(false);
@@ -48,6 +50,7 @@ export default function HodProfile() {
 
   // Password visibility
   const [showPassword, setShowPassword] = useState(false);
+  const [showAltPassword, setShowAltPassword] = useState(false);
 
   // Initialize profile
   useEffect(() => {
@@ -57,6 +60,8 @@ export default function HodProfile() {
         username: hod.username || "",
         email: hod.email || "",
         password: "",
+        altPassword: "",
+
       };
       setProfile(initProfile);
       setEditedProfile(initProfile);
@@ -65,11 +70,11 @@ export default function HodProfile() {
 
   // ---------------- Handlers ----------------
   const handleCancelDirect = () => {
-    setEditedProfile({ ...profile, password: "" });
+    setEditedProfile({ ...profile, password: "", altPassword: "" });
     setIsEditingDirect(false);
   };
   const handleCancelSensitive = () => {
-    setEditedProfile({ ...profile, password: "" });
+    setEditedProfile({ ...profile, password: "", altPassword: "" });
     setIsEditingSensitive(false);
   };
 
@@ -89,6 +94,9 @@ export default function HodProfile() {
       if (editedProfile.email !== profile.email)
         sensitive.email = editedProfile.email;
       if (editedProfile.password) sensitive.password = editedProfile.password;
+
+      if (editedProfile.altPassword)
+        sensitive.altPassword = editedProfile.altPassword;
 
       if (Object.keys(direct).length && Object.keys(sensitive).length) {
         toast.error("⚠️ Cannot update normal and sensitive fields together.");
@@ -206,11 +214,10 @@ export default function HodProfile() {
                     }))
                   }
                   disabled={!isEditingDirect}
-                  className={`mt-1 block w-full rounded-md border px-3 py-2 ${
-                    isEditingDirect
-                      ? "border-purple-400"
-                      : "border-gray-200 bg-gray-100"
-                  }`}
+                  className={`mt-1 block w-full rounded-md border px-3 py-2 ${isEditingDirect
+                    ? "border-purple-400"
+                    : "border-gray-200 bg-gray-100"
+                    }`}
                 />
               </div>
               <div>
@@ -227,11 +234,10 @@ export default function HodProfile() {
                     }))
                   }
                   disabled={!isEditingDirect}
-                  className={`mt-1 block w-full rounded-md border px-3 py-2 ${
-                    isEditingDirect
-                      ? "border-purple-400"
-                      : "border-gray-200 bg-gray-100"
-                  }`}
+                  className={`mt-1 block w-full rounded-md border px-3 py-2 ${isEditingDirect
+                    ? "border-purple-400"
+                    : "border-gray-200 bg-gray-100"
+                    }`}
                 />
               </div>
 
@@ -290,11 +296,10 @@ export default function HodProfile() {
                     }))
                   }
                   disabled={!isEditingSensitive}
-                  className={`mt-1 block w-full rounded-md border px-3 py-2 ${
-                    isEditingSensitive
-                      ? "border-red-400"
-                      : "border-gray-200 bg-gray-100"
-                  }`}
+                  className={`mt-1 block w-full rounded-md border px-3 py-2 ${isEditingSensitive
+                    ? "border-red-400"
+                    : "border-gray-200 bg-gray-100"
+                    }`}
                 />
               </div>
               <div>
@@ -313,11 +318,10 @@ export default function HodProfile() {
                     }
                     disabled={!isEditingSensitive}
                     placeholder="Enter new password"
-                    className={`mt-1 block w-full rounded-md border px-3 py-2 ${
-                      isEditingSensitive
-                        ? "border-red-400"
-                        : "border-gray-200 bg-gray-100"
-                    }`}
+                    className={`mt-1 block w-full rounded-md border px-3 py-2 ${isEditingSensitive
+                      ? "border-red-400"
+                      : "border-gray-200 bg-gray-100"
+                      }`}
                   />
                   {isEditingSensitive && (
                     <button
@@ -326,6 +330,39 @@ export default function HodProfile() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mt-2">
+                  <KeyRound size={16} /> Alternate Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showAltPassword ? "text" : "password"}
+                    value={editedProfile.altPassword}
+                    onChange={(e) =>
+                      setEditedProfile((prev) => ({
+                        ...prev,
+                        altPassword: e.target.value,
+                      }))
+                    }
+                    disabled={!isEditingSensitive}
+                    placeholder="Enter new alternate password"
+                    className={`mt-1 block w-full rounded-md border px-3 py-2 ${isEditingSensitive
+                      ? "border-red-400"
+                      : "border-gray-200 bg-gray-100"
+                      }`}
+                  />
+                  {isEditingSensitive && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAltPassword((p) => !p)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600"
+                    >
+                      {showAltPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   )}
                 </div>
