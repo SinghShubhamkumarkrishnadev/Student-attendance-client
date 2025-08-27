@@ -378,11 +378,33 @@ export default function AssignStudentsPage() {
   const selectedCount = selectedStudents.length;
   const assignedCount = selectedClass ? (findClassById(selectedClass)?.students?.length || 0) : 0;
 
+  // slices to show (move this up!)
+  const availableToShow = filteredAvailable.slice(0, availableVisibleCount);
+  const assignedToShow = assignedList.slice(0, assignedVisibleCount);
+
+  // 1. Compute visible IDs
+  const visibleAvailableIds = useMemo(
+    () => availableToShow.map((s) => String(s._id)),
+    [availableToShow]
+  );
   const areAllVisibleSelected = useMemo(() => {
-    if (filteredAvailable.length === 0) return false;
-    const filteredIds = filteredAvailable.map((s) => String(s._id));
-    return filteredIds.every((id) => selectedStudents.includes(id));
-  }, [filteredAvailable, selectedStudents]);
+    if (visibleAvailableIds.length === 0) return false;
+    return visibleAvailableIds.every((id) => selectedStudents.includes(id));
+  }, [visibleAvailableIds, selectedStudents]);
+
+  const isSomeVisibleSelected = useMemo(() => {
+    if (visibleAvailableIds.length === 0) return false;
+    return visibleAvailableIds.some((id) => selectedStudents.includes(id));
+  }, [visibleAvailableIds, selectedStudents]);
+
+  // 3. Ref for indeterminate state
+  const selectVisibleRef = useRef(null);
+  useEffect(() => {
+    if (selectVisibleRef.current) {
+      selectVisibleRef.current.indeterminate =
+        isSomeVisibleSelected && !areAllVisibleSelected;
+    }
+  }, [isSomeVisibleSelected, areAllVisibleSelected]);
 
   const handleToggleSelectVisible = () => {
     const visibleIds = filteredAvailable.slice(0, availableVisibleCount).map((s) => String(s._id));
@@ -422,10 +444,6 @@ export default function AssignStudentsPage() {
     const allAssignedIds = assignedList.map((s) => String(s._id));
     setSelectedAssignedIds((prev) => Array.from(new Set([...prev, ...allAssignedIds])));
   };
-
-  // slices to show
-  const availableToShow = filteredAvailable.slice(0, availableVisibleCount);
-  const assignedToShow = assignedList.slice(0, assignedVisibleCount);
 
   return (
     <div className="p-6 min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
@@ -582,6 +600,7 @@ export default function AssignStudentsPage() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4 mb-4">
             <label className="inline-flex items-center gap-2">
               <input
+                ref={selectVisibleRef}
                 type="checkbox"
                 checked={areAllVisibleSelected}
                 onChange={handleToggleSelectVisible}
@@ -590,6 +609,7 @@ export default function AssignStudentsPage() {
               />
               <span className="text-sm">Select visible (available)</span>
             </label>
+
 
             <button
               onClick={handleSelectAllByFilter}

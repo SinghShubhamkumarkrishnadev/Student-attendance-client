@@ -266,7 +266,7 @@ export default function AssignProfessorsPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {filteredAvailable.length === 0 ? (
-              <p className="text-gray-500">🚫 No professors match the filters.</p>
+              <p className="text-gray-500">🚫 No professors found</p>
             ) : (
               filteredAvailable.slice(0, visibleCount).map((prof) => {
                 const profIdStr = String(prof._id);
