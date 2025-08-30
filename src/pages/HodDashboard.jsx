@@ -197,6 +197,15 @@ export default function HodDashboard() {
             <h2 className="text-xl font-bold text-gray-800">Assign Students</h2>
             <p className="text-gray-500">Map students to classes</p>
           </div>
+          <div
+            onClick={() => navigate("/hod/attendance")}
+            className="cursor-pointer bg-white rounded-2xl shadow-lg p-6 text-center hover:scale-105 transition"
+          >
+            <div className="text-4xl mb-2">📊</div>
+            <h2 className="text-xl font-bold text-gray-800">Attendance</h2>
+            <p className="text-gray-500">View class/student attendance</p>
+          </div>
+
         </div>
       </div>
 

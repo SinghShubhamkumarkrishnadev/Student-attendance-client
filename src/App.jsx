@@ -12,6 +12,7 @@ import AssignStudentsPage from "./pages/AssignStudentsPage";
 import HodProfile from "./pages/HodProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ConfirmProvider } from "./components/ConfirmProvider"; // ⬅️ add this
+import HodAttendance from "./pages/HodAttendance";
 
 function App() {
   const { hod, token } = useAuth();
@@ -29,6 +30,12 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/hod/attendance"
+            element={<HodAttendance />
+            }
+          />
+
           <Route
             path="/hod/students"
             element={

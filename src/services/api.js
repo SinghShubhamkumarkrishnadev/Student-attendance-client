@@ -334,4 +334,55 @@ export const bulkUploadClasses = async (file) => {
   return res.data;
 };
 
+
+// ====================== ATTENDANCE (READ-ONLY) APIs ======================
+
+// Helper to safely unwrap various response shapes you’ve been using
+const _pluckRecords = (res) =>
+  res?.data?.data?.records ??
+  res?.data?.records ??
+  res?.data?.data ??
+  res?.data ??
+  [];
+
+/**
+ * Get attendance of a class on a specific day (and optional slot)
+ * Backend supports either ?date=YYYY-MM-DD or ?dateMs=1693180800000, plus optional ?slotNumber
+ * GET /attendance/:classId
+ */
+export const getAttendanceByDate = async (classId, params = {}) => {
+  const res = await API.get(`/attendance/${classId}`, { params });
+  return _pluckRecords(res);
+};
+
+/**
+ * Convenience: broader class fetch with optional filters (?dateMs, ?slotNumber)
+ * GET /attendance/class/:classId
+ */
+export const getClassAttendance = async (classId, params = {}) => {
+  const res = await API.get(`/attendance/class/${classId}`, { params });
+  return _pluckRecords(res);
+};
+
+/**
+ * Monthly summary for a class (requires ?month=1..12 & ?year=YYYY)
+ * GET /attendance/summary/:classId
+ * Returns { month, year, classId, summary: [...] }
+ */
+export const getMonthlyAttendanceSummary = async (classId, params = {}) => {
+  const res = await API.get(`/attendance/summary/${classId}`, { params });
+  // Keep entire payload because you’ll likely need month/year + summary
+  return res?.data?.data ?? res?.data;
+};
+
+/**
+ * Full history for a student (optionally filter with ?classId, ?dateMs, ?slotNumber in future if you add)
+ * GET /attendance/student/:studentId
+ */
+export const getStudentAttendance = async (studentId, params = {}) => {
+  const res = await API.get(`/attendance/student/${studentId}`, { params });
+  return _pluckRecords(res);
+};
+
+
 export default API;
