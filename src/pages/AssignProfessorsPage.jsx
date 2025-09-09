@@ -25,6 +25,20 @@ export default function AssignProfessorsPage() {
   // UX loading states
   const [assigning, setAssigning] = useState(false);
   const [removingId, setRemovingId] = useState(null); // id of professor being removed
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [removingBulk, setRemovingBulk] = useState(false);
+
+    // --- new pagination states ---
+  const PAGE_SIZE = 10;
+  const [availableVisibleCount, setAvailableVisibleCount] = useState(PAGE_SIZE);
+  const [assignedVisibleCount, setAssignedVisibleCount] = useState(PAGE_SIZE);
+
+  // --- state you need ---
+  const [students, setStudents] = useState([]);
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [selectedAssignedIds, setSelectedAssignedIds] = useState([]);
+
 
   const confirm = useConfirm();
 
@@ -63,6 +77,7 @@ export default function AssignProfessorsPage() {
 
   const fetchClasses = async () => {
     try {
+      setLoadingClasses(true);
       const res = await getClasses();
       const list = normalizeClassesResp(res);
       setClasses(list);
@@ -70,6 +85,8 @@ export default function AssignProfessorsPage() {
       console.error("fetchClasses error", err);
       setError("⚠️ Failed to load classes");
       toast.error("⚠️ Failed to load classes");
+    } finally {
+      setLoadingClasses(false);
     }
   };
 
@@ -101,7 +118,6 @@ export default function AssignProfessorsPage() {
         : "Failed to assign professors";
       setError(finalMsg);
       toast.error(finalMsg);
-      setAssigning(false);
     } finally {
       setAssigning(false);
     }
@@ -181,9 +197,13 @@ export default function AssignProfessorsPage() {
   const assignedCount = selectedClass ? (findClassById(selectedClass)?.professors?.length || 0) : 0;
 
   // when switching class, clear selected professors to avoid accidental assign
-  const handleClassChange = (value) => {
-    setSelectedClass(value ? value.value : null);
+  const handleClassChange = (opt) => {
+    setSelectedClass(opt ? opt.value : null);
     setSelectedProfs([]);
+    setSelectedStudents([]);
+    setSelectedAssignedIds([]);
+    setAvailableVisibleCount(PAGE_SIZE);
+    setAssignedVisibleCount(PAGE_SIZE);
     setSearchAssigned("");
   };
 
@@ -207,8 +227,9 @@ export default function AssignProfessorsPage() {
           value={selectedOption}
           onChange={handleClassChange}
           isClearable
-          isDisabled={assigning || removingId !== null}
-          placeholder="-- Select or Search a Class --"
+          isDisabled={loadingClasses || loadingStudents || assigning || removingBulk || removingId !== null}
+          isLoading={loadingClasses}
+          placeholder={loadingClasses ? "- Loading classes... -" : "- Select or Search a Class -"}
           classNamePrefix="react-select"
         />
       </div>

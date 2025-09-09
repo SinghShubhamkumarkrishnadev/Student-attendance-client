@@ -471,7 +471,6 @@ export default function AssignStudentsPage() {
       <div className="mb-6 bg-white p-4 rounded-2xl shadow-md border">
         <label className="font-medium text-gray-700 mb-2 block">📌 Select Class</label>
 
-        <div className="flex items-center gap-3">
           <Select
             options={classOptions}
             value={selectedOption}
@@ -484,18 +483,10 @@ export default function AssignStudentsPage() {
             }}
             isClearable
             isDisabled={loadingClasses || loadingStudents || assigning || removingBulk || removingId !== null}
+            isLoading={loadingClasses}
             placeholder={loadingClasses ? "- Loading classes... -" : "- Select or Search a Class -"}
             classNamePrefix="react-select"
           />
-
-          <button
-            onClick={fetchClasses}
-            className="px-3 py-2 border rounded-lg hover:bg-gray-50 transition text-sm"
-            disabled={loadingClasses}
-          >
-            {loadingClasses ? "Loading..." : "Refresh"}
-          </button>
-        </div>
       </div>
 
       {/* Summary box (white) containing the four cards */}
