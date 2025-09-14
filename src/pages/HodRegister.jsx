@@ -84,7 +84,7 @@ export default function HodRegister() {
     }
   };
 
-  // NEW: resend OTP handler for registration stage
+  // resend OTP
   const handleResendOtp = async () => {
     if (!email) {
       setError("Please provide your email in the form above to resend OTP.");
@@ -103,7 +103,6 @@ export default function HodRegister() {
       setLoading(false);
     }
   };
-
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-tr from-indigo-50 via-purple-50 to-pink-50 p-6">
@@ -243,6 +242,15 @@ export default function HodRegister() {
               className="w-full py-3 rounded-xl font-semibold text-white bg-purple-600 hover:bg-purple-700 active:scale-[0.99] transition disabled:opacity-60"
             >
               {loading ? "⏳ Registering..." : "🚀 Register"}
+            </button>
+
+            {/* 🔹 Extra button to go to Verify OTP form */}
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="w-full py-2 mt-2 rounded-xl font-semibold text-purple-600 bg-purple-100 hover:bg-purple-200 active:scale-[0.99] transition"
+            >
+              Go to Verify OTP
             </button>
           </form>
         )}
