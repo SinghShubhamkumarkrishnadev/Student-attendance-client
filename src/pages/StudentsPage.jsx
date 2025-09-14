@@ -26,6 +26,8 @@ import {
   Trash2,
   CheckSquare,
   Square,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 
 export default function StudentPage() {
@@ -47,6 +49,8 @@ export default function StudentPage() {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+
+  const [showHelper, setShowHelper] = useState(false);
 
   // per-card edit loading + saving state
   const [editingId, setEditingId] = useState(null); // id currently being fetched for edit
@@ -398,7 +402,9 @@ export default function StudentPage() {
 
       {/* Bulk Upload Students */}
       <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
-        <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Students</h2>
+        <h2 className="font-semibold mb-2 text-purple-700">
+          📥 Bulk Upload Students
+        </h2>
 
         {/* Responsive Row */}
         <div className="flex flex-col md:flex-row gap-3 md:items-center">
@@ -427,14 +433,96 @@ export default function StudentPage() {
           </button>
         </div>
 
-        {/* Helper Text */}
-        <p className="text-sm text-gray-500 mt-1">
-          Only Excel files (.xlsx, .xls) with{" "}
-          <strong>Name, Enrollment Number, Semester,</strong> and{" "}
-          <strong>Division</strong> (optional) columns are supported.
-        </p>
-      </div>
+        {/* Toggle Helper Text */}
+        <div className="mt-3">
+          <button
+            onClick={() => setShowHelper((prev) => !prev)}
+            className="flex items-center gap-1 text-purple-600 text-sm font-medium hover:underline"
+          >
+            {showHelper ? (
+              <>
+                Hide file format details <ChevronUp size={16} />
+              </>
+            ) : (
+              <>
+                View file format requirements <ChevronDown size={16} />
+              </>
+            )}
+          </button>
 
+          {/* Collapsible Helper Text */}
+          {showHelper && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-gray-700">
+              <p className="mb-1 font-medium text-purple-800">
+                📄 Excel File Format Requirements:
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  File type must be <strong>.xlsx</strong> or <strong>.xls</strong>.
+                </li>
+                <li>
+                  <strong>Required columns:</strong>
+                  <ul className="list-disc list-inside ml-5">
+                    <li>
+                      <code>enrollmentNumber</code> – Unique student enrollment/roll
+                      number
+                      <br />
+                      <span className="text-gray-500 text-xs">
+                        Accepted headers: <code>enrollmentNumber</code>,{" "}
+                        <code>enrollment</code>, <code>enrollmentNo</code>,{" "}
+                        <code>enrollNumber</code>, <code>roll</code>,{" "}
+                        <code>rollNumber</code>, <code>id</code>
+                      </span>
+                    </li>
+                    <li>
+                      <code>name</code> – Student’s full name
+                      <br />
+                      <span className="text-gray-500 text-xs">
+                        Accepted headers: <code>name</code>, <code>studentName</code>,{" "}
+                        <code>fullName</code>, <code>student</code>
+                      </span>
+                    </li>
+                    <li>
+                      <code>semester</code> – Current semester (numeric)
+                      <br />
+                      <span className="text-gray-500 text-xs">
+                        Accepted headers: <code>semester</code>, <code>sem</code>,{" "}
+                        <code>classSemester</code>
+                      </span>
+                    </li>
+                    <li>
+                      <code>division</code> (optional) – Section/division for the
+                      class (e.g., A, B)
+                      <br />
+                      <span className="text-gray-500 text-xs">
+                        Accepted headers: <code>division</code>, <code>div</code>,{" "}
+                        <code>section</code>
+                      </span>
+                    </li>
+                  </ul>
+                </li>
+                <li>
+                  Column headers are <em>case-insensitive</em>. Example:{" "}
+                  <code>ENROLLMENTNO</code> or <code>Roll</code> are both valid.
+                </li>
+                <li>
+                  Each row represents <strong>one student</strong>.
+                  <br />
+                  <span className="text-gray-500 text-xs">
+                    Example: Row with <code>enrollmentNumber = 2024CS001</code>,{" "}
+                    <code>name = John Doe</code>, <code>semester = 3</code>,{" "}
+                    <code>division = A</code>
+                  </span>
+                </li>
+                <li>
+                  Duplicate enrollment numbers under the same HOD are automatically
+                  skipped.
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Add Single Student */}
       <div className="mb-6 bg-white p-6 rounded-2xl shadow-md border">

@@ -21,6 +21,8 @@ import {
   Trash2, // ✅ added
   CheckSquare, // ✅ added
   Square,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -46,6 +48,8 @@ export default function ClassesPage() {
   const [adding, setAdding] = useState(false);
   const [editLoadingId, setEditLoadingId] = useState(null); // micro spinner when entering edit mode
   const [savingId, setSavingId] = useState(null); // id being saved
+
+  const [showClassHelper, setShowClassHelper] = useState(false);
 
   const [bulkFile, setBulkFile] = useState(null);
   const [bulkUploading, setBulkUploading] = useState(false);
@@ -349,7 +353,9 @@ export default function ClassesPage() {
 
       {/* Bulk Upload Classes */}
       <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
-        <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Classes</h2>
+        <h2 className="font-semibold mb-2 text-purple-700">
+          📥 Bulk Upload Classes
+        </h2>
 
         {/* Responsive Row */}
         <div className="flex flex-col md:flex-row gap-3 md:items-center">
@@ -378,11 +384,71 @@ export default function ClassesPage() {
           </button>
         </div>
 
-        {/* Helper Text */}
-        <p className="text-sm text-gray-500 mt-1">
-          Only Excel files (.xlsx, .xls) with <strong>className</strong> and <strong>division</strong> columns are supported.
-        </p>
+        {/* Toggle Helper Text */}
+        <div className="mt-3">
+          <button
+            onClick={() => setShowClassHelper((prev) => !prev)}
+            className="flex items-center gap-1 text-purple-600 text-sm font-medium hover:underline"
+          >
+            {showClassHelper ? (
+              <>
+                Hide file format details <ChevronUp size={16} />
+              </>
+            ) : (
+              <>
+                View file format requirements <ChevronDown size={16} />
+              </>
+            )}
+          </button>
+
+          {/* Collapsible Helper Text */}
+          {showClassHelper && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-gray-700">
+              <p className="mb-1 font-medium text-purple-800">
+                📄 Excel File Format Requirements:
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  File type must be <strong>.xlsx</strong> or <strong>.xls</strong>.
+                </li>
+                <li>
+                  <strong>Required columns:</strong>
+                  <ul className="list-disc list-inside ml-5">
+                    <li>
+                      <code>className</code> – Name of the class (e.g., "BSc Computer Science")
+                      <br />
+                      <span className="text-gray-500 text-xs">
+                        Accepted headers: <code>className</code>, <code>class</code>, <code>name</code>
+                      </span>
+                    </li>
+                    <li>
+                      <code>division</code> – Division/Section for the class (e.g., "A", "B")
+                      <br />
+                      <span className="text-gray-500 text-xs">
+                        Accepted headers: <code>division</code>, <code>section</code>, <code>div</code>
+                      </span>
+                    </li>
+                  </ul>
+                </li>
+                <li>
+                  Column headers are <em>case-insensitive</em> (e.g., <code>ClassName</code>, <code>DIVISION</code> are valid).
+                </li>
+                <li>
+                  Each row represents one class–division pair.
+                  <br />
+                  <span className="text-gray-500 text-xs">
+                    Example: Row with <code>className = BSc IT</code> and <code>division = A</code> creates "BSc IT - A".
+                  </span>
+                </li>
+                <li>
+                  Duplicate classes (same className + division) are automatically skipped if they already exist.
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
+
 
 
       {/* Add Class Form */}

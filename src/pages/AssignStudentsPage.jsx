@@ -446,8 +446,8 @@ export default function AssignStudentsPage() {
   };
 
   return (
-    <div className="p-6 min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
-      <h1 className="text-3xl font-bold mb-6 flex items-center gap-2 text-green-700">
+    <div className="p-6 min-h-screen bg-gradient-to-br from-purple-50 via-violet-50 to-indigo-50">
+      <h1 className="text-3xl font-bold mb-6 flex items-center gap-2 text-purple-700">
         👨‍🎓 Assign Students to Classes
       </h1>
 

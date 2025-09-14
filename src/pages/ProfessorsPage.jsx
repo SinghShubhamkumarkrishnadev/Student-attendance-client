@@ -25,6 +25,8 @@ import {
   Trash2,
   CheckSquare,
   Square,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useConfirm } from "../components/ConfirmProvider";
@@ -38,6 +40,8 @@ export default function ProfessorsPage() {
 
   const [showPasswordAdd, setShowPasswordAdd] = useState(false); // for Add form
   const [showPasswordEdits, setShowPasswordEdits] = useState({}); // per-professor toggle
+
+  const [showProfessorHelper, setShowProfessorHelper] = useState(false);
 
   // New UI state
   const [search, setSearch] = useState("");
@@ -353,7 +357,9 @@ export default function ProfessorsPage() {
 
       {/* Bulk Upload Professors */}
       <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border">
-        <h2 className="font-semibold mb-2 text-purple-700">📥 Bulk Upload Professors</h2>
+        <h2 className="font-semibold mb-2 text-purple-700">
+          📥 Bulk Upload Professors
+        </h2>
 
         {/* Responsive Row */}
         <div className="flex flex-col md:flex-row gap-3 md:items-center">
@@ -382,11 +388,79 @@ export default function ProfessorsPage() {
           </button>
         </div>
 
-        {/* Helper Text */}
-        <p className="text-sm text-gray-500 mt-1">
-          Excel file (.xlsx, .xls or .csv). Required columns: <strong>name</strong>, <strong>username</strong>. Password optional.
-        </p>
+        {/* Toggle Helper Text */}
+        <div className="mt-3">
+          <button
+            onClick={() => setShowProfessorHelper((prev) => !prev)}
+            className="flex items-center gap-1 text-purple-600 text-sm font-medium hover:underline"
+          >
+            {showProfessorHelper ? (
+              <>
+                Hide file format details <ChevronUp size={16} />
+              </>
+            ) : (
+              <>
+                View file format requirements <ChevronDown size={16} />
+              </>
+            )}
+          </button>
+
+          {/* Collapsible Helper Text */}
+          {showProfessorHelper && (
+            <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-gray-700">
+              <p className="mb-1 font-medium text-purple-800">
+                📄 Excel File Format Requirements:
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  File type must be <strong>.xlsx</strong>, <strong>.xls</strong>, or <strong>.csv</strong>.
+                </li>
+                <li>
+                  <strong>Required columns:</strong>
+                  <ul className="list-disc list-inside ml-5">
+                    <li>
+                      <code>name</code> – Professor’s full name
+                      <br />
+                      <span className="text-gray-500 text-xs">
+                        Accepted headers: <code>name</code>, <code>professorname</code>, <code>profname</code>
+                      </span>
+                    </li>
+                    <li>
+                      <code>username</code> – Unique login ID (must not already exist)
+                      <br />
+                      <span className="text-gray-500 text-xs">
+                        Accepted headers: <code>username</code>, <code>user</code>, <code>login</code>
+                      </span>
+                    </li>
+                  </ul>
+                </li>
+                <li>
+                  <strong>Optional column:</strong>
+                  <ul className="list-disc list-inside ml-5">
+                    <li>
+                      <code>password</code> – If provided, that password will be used.
+                      <br />
+                      <span className="text-gray-500 text-xs">
+                        Accepted headers: <code>password</code>, <code>pass</code>
+                      </span>
+                    </li>
+                    <li>
+                      If omitted or left blank, the default password will be <code>Temp@1234</code>.
+                    </li>
+                  </ul>
+                </li>
+                <li>
+                  Column headers are <em>case-insensitive</em> (e.g., <code>Name</code>, <code>USERNAME</code> are valid).
+                </li>
+                <li>
+                  Each row represents one professor. Empty rows are skipped automatically.
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
+
 
 
       {/* Add Professor Form */}
